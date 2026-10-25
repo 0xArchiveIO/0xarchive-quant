@@ -40,11 +40,11 @@ Hand your coding agent a wallet, a trading idea, a Pine script, a paper or someo
 ## Install
 
 ```bash
-git clone https://github.com/0xArchiveIO/0xarchive-skill.git
+git clone https://github.com/0xArchiveIO/0xarchive-quant.git
 
 # Claude Code (Codex: .agents/skills instead)
 mkdir -p .claude/skills
-cp -R 0xarchive-skill/skills/backtest .claude/skills/0xarchive-backtest
+cp -R 0xarchive-quant/skills/backtest .claude/skills/0xarchive-backtest
 
 # The engine: Rust, built once (needs cargo, https://rustup.rs)
 pip install ".claude/skills/0xarchive-backtest/engine/crates/py[curated]"
@@ -112,15 +112,15 @@ The original skill: one authenticated request to one live market-data answer, wi
 Use this skill when Claude Code, ChatGPT Codex, or another local skill-capable coding agent needs the fastest route from `X-API-Key` to one live market-data answer. Use [AI Clients](https://docs.0xarchive.io/ai-clients) to choose between skills, MCP, CLI, markdown docs, `llms.txt`, OpenAPI, and other Claude Code or ChatGPT Codex routes.
 
 ```bash
-git clone https://github.com/0xArchiveIO/0xarchive-skill.git
+git clone https://github.com/0xArchiveIO/0xarchive-quant.git
 
 # Claude Code: project skill
 mkdir -p .claude/skills/0xarchive
-cp 0xarchive-skill/skills/query/SKILL.md .claude/skills/0xarchive/SKILL.md
+cp 0xarchive-quant/skills/query/SKILL.md .claude/skills/0xarchive/SKILL.md
 
 # ChatGPT Codex: repo-scoped skill
 mkdir -p .agents/skills/0xarchive
-cp 0xarchive-skill/skills/query/SKILL.md .agents/skills/0xarchive/SKILL.md
+cp 0xarchive-quant/skills/query/SKILL.md .agents/skills/0xarchive/SKILL.md
 
 export OXARCHIVE_API_KEY="0xa_your_api_key"
 ```
