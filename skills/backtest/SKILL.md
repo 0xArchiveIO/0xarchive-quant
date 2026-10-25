@@ -32,11 +32,11 @@ API reference).
 Check once per session, and only what the route needs. Paths below are relative to this skill's
 directory.
 
-1. **The engine:** `0xbt --version` should print `0xbt 0.3.0`. If it's missing or older, install it into
+1. **The engine:** `0xbt --version` should print `0xbt 0.3.1`. If it's missing or older, install it into
    the project's Python environment (Python 3.12 or later; prebuilt for macOS, Linux and Windows):
 
    ```bash
-   pip install "0xarchive-backtest[curated]==0.3.0"
+   pip install "0xarchive-backtest[curated]==0.3.1"
    ```
 
    On a platform without a prebuilt wheel, pip builds it from source, which needs Rust (`cargo

@@ -4,10 +4,30 @@ build-backend = "maturin"
 
 [project]
 name = "0xarchive-backtest"
-version = "0.3.0"
-description = "0xArchive backtest engine: deterministic local backtesting for 0xArchive data"
+version = "0.3.1"
+description = "Deterministic backtesting for Hyperliquid perps on 0xArchive data: a Rust engine, Python strategies, and a gauntlet that says whether an edge is real"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+authors = [{ name = "0xArchive" }]
+keywords = ["backtesting", "quant", "trading", "hyperliquid", "crypto", "perpetuals", "rust", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+[project.urls]
+Homepage = "https://www.0xarchive.io"
+Source = "https://github.com/0xArchiveIO/0xarchive-quant"
+Documentation = "https://github.com/0xArchiveIO/0xarchive-quant/blob/main/skills/backtest/references/strategy-api.md"
+Issues = "https://github.com/0xArchiveIO/0xarchive-quant/issues"
 
 [project.optional-dependencies]
 # The curated package set at pinned versions; must match

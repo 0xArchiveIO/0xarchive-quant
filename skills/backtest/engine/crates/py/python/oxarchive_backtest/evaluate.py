@@ -266,6 +266,10 @@ def _sharpe(stats):
     return (stats or {}).get("sharpe")
 
 
+def _num(x, fmt="{:.2f}"):
+    return "n/a" if x is None else fmt.format(x)
+
+
 def _neighbours(params, best, rows):
     """Sharpes of the grid points one step from `best` in one parameter."""
     out = []
@@ -412,20 +416,21 @@ def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *
     reasons, level = [], 6
     if sharpe is None or sharpe <= 0:
         level = 1
-        reasons.append(f"Sharpe {sharpe} after costs")
+        reasons.append(f"Sharpe {_num(sharpe)} after costs")
     elif nulls is not None and (
         (nulls["flipped"] is not None and nulls["flipped"] >= sharpe)
         or (nulls.get("random_share_above") or 0) > NULL_SHARE
         or (nulls.get("stale_share_above") or 0) > NULL_SHARE
     ):
         level = 2
-        reasons.append(f"nulls: flipped {nulls['flipped']}, random at or above "
-                       f"{nulls.get('random_share_above')}, stale at or above "
-                       f"{nulls.get('stale_share_above')} (bar {NULL_SHARE})")  # fmt: skip
+        share = lambda k: _num(nulls.get(k), "{:.0%}")
+        reasons.append(f"nulls: flipped Sharpe {_num(nulls['flipped'])}, random at or above "
+                       f"{share('random_share_above')}, stale at or above "
+                       f"{share('stale_share_above')} (bar {NULL_SHARE:.0%})")  # fmt: skip
     elif (_sharpe(split_out["out_of_sample"]) or 0) <= 0 or (wf and (_sharpe(wf["stats"]) or 0) <= 0):
         level = 3
-        reasons.append(f"out of sample: split Sharpe {_sharpe(split_out['out_of_sample'])}, "
-                       f"walk-forward Sharpe {_sharpe(wf['stats']) if wf else None}")  # fmt: skip
+        reasons.append(f"out of sample: split Sharpe {_num(_sharpe(split_out['out_of_sample']))}, "
+                       f"walk-forward Sharpe {_num(_sharpe(wf['stats']) if wf else None)}")  # fmt: skip
     elif deflated["deflated_sharpe"] < DEFLATED_BAR:
         level = 4
         reasons.append(f"deflated Sharpe {deflated['deflated_sharpe']:.2f} over "

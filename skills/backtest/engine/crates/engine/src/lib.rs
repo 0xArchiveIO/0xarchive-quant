@@ -46,7 +46,7 @@ pub mod universe;
 
 use oxs_schema::Row;
 
-pub const ENGINE_VERSION: &str = "0.3.0";
+pub const ENGINE_VERSION: &str = "0.3.1";
 pub const FILL_MODEL: &str = "bar-v2";
 
 pub type OrderId = u64;
