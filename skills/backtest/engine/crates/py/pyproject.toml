@@ -4,9 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "0xarchive-backtest"
-version = "0.0.0"
+version = "0.3.0"
 description = "0xArchive backtest engine: deterministic local backtesting for 0xArchive data"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 
 [project.optional-dependencies]

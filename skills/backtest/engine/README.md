@@ -4,9 +4,14 @@ The backtester the `0xarchive-backtest` skill runs: Rust crates for fills, portf
 liquidation, bars, calendars and deterministic math, with a Python strategy API on top.
 
 ```bash
-pip install "crates/py[curated]"     # builds the Rust extension; needs cargo
-0xbt --help
+pip install "0xarchive-backtest[curated]"   # prebuilt wheels: macOS, Linux, Windows; Python 3.12+
+pip install "crates/py[curated]"            # or from this source; needs cargo
+0xbt --version
 ```
+
+Releases: a tag `engine-vX.Y.Z` builds the wheels and publishes them to PyPI (`.github/workflows/engine.yml`).
+The package version is the engine version, `ENGINE_VERSION` in `crates/engine/src/lib.rs`, which receipts
+record; bump both, and the pin in `../SKILL.md`, together.
 
 | Crate | What it is |
 |---|---|

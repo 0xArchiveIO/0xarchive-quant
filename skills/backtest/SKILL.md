@@ -32,14 +32,16 @@ API reference).
 Check once per session, and only what the route needs. Paths below are relative to this skill's
 directory.
 
-1. **The engine:** `0xbt --help`. If it's missing, install it from `engine/` into the project's Python
-   environment (it compiles, so it needs Rust: `cargo --version`):
+1. **The engine:** `0xbt --version` should print `0xbt 0.3.0`. If it's missing or older, install it into
+   the project's Python environment (Python 3.12 or later; prebuilt for macOS, Linux and Windows):
 
    ```bash
-   pip install "<skill dir>/engine/crates/py[curated]"
+   pip install "0xarchive-backtest[curated]==0.3.0"
    ```
 
-   No Rust: ask the user before installing it (https://rustup.rs). Never write a substitute backtester.
+   On a platform without a prebuilt wheel, pip builds it from source, which needs Rust (`cargo
+   --version`; ask the user before installing it from https://rustup.rs). `engine/` beside this skill
+   is the same source. Never write a substitute backtester.
 2. **The API key:** `$OXARCHIVE_API_KEY` must be set for pulling data and for the trader route. Never
    print it. Free keys read only the last 30 days; longer backtests need a paid plan.
 3. **The data:** minute Parquet files, `data/hyperliquid/<MARKET>/<YYYY-MM>.parquet`. Use what is in the

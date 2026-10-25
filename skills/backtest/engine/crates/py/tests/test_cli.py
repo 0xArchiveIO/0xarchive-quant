@@ -235,3 +235,10 @@ def test_cli_hourly_writes_bars_the_universe_reads(tmp_path, capsys):
     assert hourly.files[0][2] == "lcg-3000+1h"
     assert main(["hourly", "--data", str(d)]) == 0
     assert "0 hourly file(s)" in capsys.readouterr().out
+
+
+def test_package_version_is_the_engine_version():
+    # Receipts carry engine_version; the PyPI version names the same thing.
+    import importlib.metadata
+
+    assert importlib.metadata.version("0xarchive-backtest") == oxb.engine_version()
