@@ -7,6 +7,7 @@ name = "0xarchive-backtest"
 version = "0.0.0"
 description = "0xArchive strategy engine: local backtesting with the same engine as the browser"
 requires-python = ">=3.10"
+license = "MIT"
 
 [project.optional-dependencies]
 # The curated package set at Pyodide 314.0.7's versions; must match

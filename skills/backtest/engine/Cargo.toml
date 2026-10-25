@@ -6,7 +6,7 @@ default-members = ["crates/schema", "crates/engine", "crates/math", "crates/data
 
 [workspace.package]
 edition = "2024"
-license = "UNLICENSED"
+license = "MIT"
 publish = false
 
 [profile.release]
