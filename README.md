@@ -43,6 +43,39 @@ Both clients can also load the skill on their own when a request matches its des
 
 Expected result: current or recent 0xArchive market data, or a direct auth/configuration error.
 
+## Backtest Skill: `0xarchive-backtest`
+
+Reverse engineer any trader, or test any trading idea, the way a careful quant desk would. Hand your agent a wallet, a one-line idea, a tweet, a Pine script, a paper, someone else's backtest or a strategy file, and it comes back with a verdict and a receipt anyone can rerun.
+
+```bash
+# Claude Code: project skill (the whole directory: it has references, a script and a template)
+mkdir -p .claude/skills
+cp -R 0xarchive-skill/skills/backtest .claude/skills/0xarchive-backtest
+
+# ChatGPT Codex
+mkdir -p .agents/skills
+cp -R 0xarchive-skill/skills/backtest .agents/skills/0xarchive-backtest
+```
+
+It needs the `0xarchive-strategy` engine (the `0xs` command) and a directory of 0xArchive minute Parquet files to backtest on. The trader route also needs `OXARCHIVE_API_KEY`.
+
+| Ask | What happens |
+|---|---|
+| `/0xarchive-backtest reverse engineer 0x...` | Pulls the wallet's position changes, profiles its style, runs its book through the engine, tests skill against luck, and scores candidate rules by how much of the book they reproduce |
+| `/0xarchive-backtest does a funding flip predict a reversal?` | Writes the claim as a spec with a kill condition, runs an event study, then a strategy through the gauntlet |
+| `/0xarchive-backtest port this Pine script` | Ports it to the strategy API, checks the port bar by bar, then tests it |
+| `/0xarchive-backtest audit backtest.py` | Lists lookahead, survivorship, cost and fill problems line by line, then reruns it honestly |
+| `/0xarchive-backtest find me something in cross-sectional momentum` | A declared search with a trial budget, then one candidate committed to the sealed holdout |
+
+What keeps the answers honest:
+
+- **A trial ledger.** Every backtest the agent runs is recorded, and the deflated Sharpe counts all of them, so the tenth tweak isn't reported as the first try.
+- **A sealed holdout.** The last months of data can't be read until one candidate is committed, once.
+- **A verdict read off fixed rules**, never the agent's judgment: `loses after costs`, `fails nulls`, `in-sample only`, `holds out of sample`, `passes deflated Sharpe`, `passes sealed holdout`.
+- **Receipts.** The engine is deterministic: the same engine, data, strategy and parameters give the same result hash on every machine.
+
+The engine's 7-day momentum example over 2025-03 to 2026-07, through the gauntlet with a 4-point grid, lands on `holds out of sample`: it beats every null and holds up out of sample, but its deflated Sharpe over 4 tries is 0.92, short of the 0.95 bar.
+
 ## Agent Integration Requirements
 
 | Agent surface | Requirement | Setup mechanic |
