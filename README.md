@@ -48,16 +48,22 @@ Expected result: current or recent 0xArchive market data, or a direct auth/confi
 Reverse engineer any trader, or test any trading idea, the way a careful quant desk would. Hand your agent a wallet, a one-line idea, a tweet, a Pine script, a paper, someone else's backtest or a strategy file, and it comes back with a verdict and a receipt anyone can rerun.
 
 ```bash
-# Claude Code: project skill (the whole directory: it has references, a script and a template)
+# Claude Code: project skill (the whole directory: the engine, references, scripts and a template)
 mkdir -p .claude/skills
 cp -R 0xarchive-skill/skills/backtest .claude/skills/0xarchive-backtest
 
 # ChatGPT Codex
 mkdir -p .agents/skills
 cp -R 0xarchive-skill/skills/backtest .agents/skills/0xarchive-backtest
+
+# The engine (Rust, built once; needs cargo from https://rustup.rs)
+pip install ".claude/skills/0xarchive-backtest/engine/crates/py[curated]"
+
+export OXARCHIVE_API_KEY="0xa_your_api_key"
+0xbt data pull --markets BTC,ETH,SOL --from 2025-06 --to 2026-09
 ```
 
-It needs the `0xarchive-strategy` engine (the `0xs` command) and a directory of 0xArchive minute Parquet files to backtest on. The trader route also needs `OXARCHIVE_API_KEY`.
+The engine is a deterministic Rust backtester with a Python strategy API (`0xbt`, `import oxarchive_backtest as oxb`): minute data, fees, funding, leverage limits and point-in-time universes, and the same result hash on every machine. `0xbt data pull` builds its minute dataset from the 0xArchive API with your key; the Free plan reads the last 30 days, longer backtests need a paid plan.
 
 | Ask | What happens |
 |---|---|

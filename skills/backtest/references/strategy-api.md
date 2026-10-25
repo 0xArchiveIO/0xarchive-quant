@@ -1,6 +1,6 @@
-# Writing a strategy (oxarchive_strategy)
+# Writing a strategy (oxarchive_backtest)
 
-The strategy API in brief, from the engine's own documentation. `help(oxs.Strategy)` and `help(x)` in
+The strategy API in brief, from the engine's own documentation. `help(oxb.Strategy)` and `help(x)` in
 Python have the rest. Checks (nulls, split, walk-forward, deflated Sharpe) are in gauntlet.md.
 
 ## The model
@@ -8,12 +8,12 @@ Python have the rest. Checks (nulls, split, walk-forward, deflated Sharpe) are i
 A strategy is a **clock** plus a chain of **steps**, each optional and each swappable:
 
 ```python
-import oxarchive_strategy as oxs
-from oxarchive_strategy import x
+import oxarchive_backtest as oxb
+from oxarchive_backtest import x
 
 vol = lambda h: h.shift(1).close.vol("30d")
 
-strategy = oxs.Strategy(
+strategy = oxb.Strategy(
     universe = x.top_n(25),                          # which markets, point in time
     clock    = x.every("7d", anchor="2025-03-22 01:00"),
     signal   = lambda h: h.close.ret("7d") / vol(h),  # a score per market
@@ -43,7 +43,7 @@ A user function can take fewer arguments than the table gives (`weights=lambda s
 
 ```python
 def strategy(lookback="7d", quantile=0.2):
-    return oxs.Strategy(..., signal=lambda h: h.close.ret(lookback) / vol(h),
+    return oxb.Strategy(..., signal=lambda h: h.close.ret(lookback) / vol(h),
                         weights=x.long_short(quantile, by=lambda h: 1 / vol(h)))
 ```
 
@@ -87,7 +87,7 @@ What signals and weights pass around: one value per market, None where unknown, 
 - `x.blend(a, b, weights=None)`: signals combined by the mean of their pct ranks.
 - Reads like a dict: `s["BTC"]`, `s.items()`, `len(s)`. `to_pandas()` for research.
 
-## Pieces (`oxarchive_strategy.x`)
+## Pieces (`oxarchive_backtest.x`)
 
 | Kind | Pieces |
 |---|---|
@@ -118,8 +118,8 @@ The check calls each step once, with every read None and `ctx.time` 0 (a step th
 ## Running
 
 ```python
-report = oxs.backtest(strategy, "2025-07-01", "2025-10-01", source="data/hyperliquid",
-                      config=oxs.Config(starting_cash=100_000, builder_fee_bps=1))
+report = oxb.backtest(strategy, "2025-07-01", "2025-10-01", source="data/hyperliquid",
+                      config=oxb.Config(starting_cash=100_000, builder_fee_bps=1))
 report.stats        # return, annual_return, volatility, sharpe, sortino, max_drawdown, calmar,
                     # hit_rate, trades, win_rate, turnover, exposure, fills, fees, funding...
 report.attribution  # {market: {pnl, fees, funding, volume, trades, wins}}
@@ -136,7 +136,7 @@ In a portfolio, a market order that the leverage cap would cut waits until the m
 
 ## Paper trading
 
-`oxs.Session(strategy, markets, start=...)` runs the same loop on rows as they arrive:
+`oxb.Session(strategy, markets, start=...)` runs the same loop on rows as they arrive:
 `session.warm_up(source)` replays the history the strategy reads, then `session.step({"BTC": row, ...})`
 once a minute with each closed minute's row, and `session.report()` gives fills and stats. Fed the
 dataset's rows, a session gives the backtest's exact result hash. It places no orders: live trading runs

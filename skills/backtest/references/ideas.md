@@ -27,9 +27,9 @@ neighbours a fair person would have picked.
 Before a strategy, measure the effect directly:
 
 ```python
-import oxarchive_strategy as oxs
+import oxarchive_backtest as oxb
 
-src = oxs.Source("data/hyperliquid")
+src = oxb.Source("data/hyperliquid")
 rows = src.rows("BTC", "2025-03-22", "2026-07-01", columns=["close", "funding_rate"])
 ```
 
@@ -51,5 +51,5 @@ result on another market is a prior, not evidence about this one.
 
 ## Writing the strategy
 
-Use the pieces in `oxarchive_strategy.x` and the reads on `h` ([strategy-api.md](strategy-api.md)). Parameters are the arguments of `def strategy(...)`. Read only through `h`,
-keep state in `ctx.state`, and run `0xs check FILE` before the first backtest.
+Use the pieces in `oxarchive_backtest.x` and the reads on `h` ([strategy-api.md](strategy-api.md)). Parameters are the arguments of `def strategy(...)`. Read only through `h`,
+keep state in `ctx.state`, and run `0xbt check FILE` before the first backtest.

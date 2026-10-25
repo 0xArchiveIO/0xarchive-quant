@@ -36,9 +36,9 @@ book they were.
 ## 2. Their record, and skill or luck
 
 ```bash
-0xs study init --holdout 2026-07-01
-0xs backtest mirror.py -p path=trader.json --start 2025-06-01 --end 2026-07-01
-0xs gauntlet mirror.py -p path=trader.json --start 2025-06-01 --end 2026-07-01 --card trader-card.md
+0xbt study init --holdout 2026-07-01
+0xbt backtest mirror.py -p path=trader.json --start 2025-06-01 --end 2026-07-01
+0xbt gauntlet mirror.py -p path=trader.json --start 2025-06-01 --end 2026-07-01 --card trader-card.md
 ```
 
 The mirror holds their signed position value in each market, scaled by their largest gross position so
@@ -57,7 +57,7 @@ usually means fast trading the hourly mirror can't follow; rerun with `clock=1m`
 ## 3. Find the rules
 
 Look at where their entries sit before guessing rules. For each opening fill in `trader.json`, read the
-minutes around it with `oxs.Source(DIR).rows(market, t - 6h, t + 1h, columns=[...])` and tabulate what
+minutes around it with `oxb.Source(DIR).rows(market, t - 6h, t + 1h, columns=[...])` and tabulate what
 was true at entry against all other hours: recent return, funding rate, open interest change, taker flow
 (`cvd_delta`), spread and depth, liquidations, the hour of day. A feature that separates their entries
 from ordinary hours is a candidate rule; one that doesn't is not, however plausible it sounds.

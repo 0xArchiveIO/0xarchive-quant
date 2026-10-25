@@ -18,7 +18,7 @@ much of its book a candidate strategy reproduces.
         Backtests the trader's book (templates/mirror.py) and the candidate over the same
         window, then compares them hour by hour: how many of the trader's held hours the
         candidate is on the same side, on the other side, or flat, and how much of the
-        trader's daily returns (in the engine, after costs) it tracks. Needs the 0xarchive-strategy
+        trader's daily returns (in the engine, after costs) it tracks. Needs the 0xarchive-backtest
         wheel. Both runs go into an active study's ledger as trials.
 
 fetch and profile use only the standard library.
@@ -320,25 +320,25 @@ def _pairs(items):
 
 def cmd_replicate(args):
     try:
-        import oxarchive_strategy as oxs
+        import oxarchive_backtest as oxb
     except ImportError:
-        raise SystemExit("replicate needs the wheel: pip install 0xarchive-strategy") from None
-    from oxarchive_strategy import study
+        raise SystemExit("replicate needs the engine: pip install <skill dir>/engine/crates/py") from None
+    from oxarchive_backtest import study
 
-    config = oxs.Config(**_pairs(args.config))
+    config = oxb.Config(**_pairs(args.config))
     t0, t1 = ms(args.start), ms(args.end)
 
     def run(path, params):
         text = pathlib.Path(path).read_text(encoding="utf-8")
-        module = oxs.load_strategy(path, name=f"oxs_{pathlib.Path(path).stem}")
+        module = oxb.load_strategy(path, name=f"oxs_{pathlib.Path(path).stem}")
         with study.running(path, text):
-            return oxs.backtest(oxs.strategy_of(module, params), t0, t1, args.data, config)
+            return oxb.backtest(oxb.strategy_of(module, params), t0, t1, args.data, config)
 
     try:
         mirror = run(args.mirror or MIRROR, {"path": str(pathlib.Path(args.book).resolve()),
                                              "clock": args.clock})
         candidate = run(args.candidate, _pairs(args.param))
-    except (ValueError, oxs.Sealed, oxs.MissingData) as e:
+    except (ValueError, oxb.Sealed, oxb.MissingData) as e:
         raise SystemExit(str(e)) from None
     out = compare(mirror, candidate, t0, t1)
     out["trader_result_hash"], out["candidate_result_hash"] = mirror.result_hash, candidate.result_hash

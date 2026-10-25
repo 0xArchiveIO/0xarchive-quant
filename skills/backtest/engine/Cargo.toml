@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["crates/schema", "crates/engine", "crates/math", "crates/dataset", "crates/build-api", "crates/py"]
+# The Python extension links against the interpreter only when built by maturin.
+default-members = ["crates/schema", "crates/engine", "crates/math", "crates/dataset", "crates/build-api"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[profile.release]
+# Determinism: no fast-math exists in Rust, but keep LTO and one codegen unit
+# so float evaluation order cannot differ between builds of the same source.
+codegen-units = 1
+lto = true

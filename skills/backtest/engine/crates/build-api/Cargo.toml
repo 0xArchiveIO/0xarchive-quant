@@ -1,0 +1,18 @@
+[package]
+name = "oxs-build-api"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "0xbt-build-api"
+path = "src/main.rs"
+
+[dependencies]
+oxs-schema = { path = "../schema" }
+oxs-dataset = { path = "../dataset" }
+ureq = "3.4.2"
+serde_json = "1.0.151"
+bytes = "1.12.1"
+sha2 = "0.11.0"

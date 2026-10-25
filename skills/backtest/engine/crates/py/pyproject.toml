@@ -1,0 +1,28 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "0xarchive-backtest"
+version = "0.0.0"
+description = "0xArchive strategy engine: local backtesting with the same engine as the browser"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+# The curated package set at Pyodide 314.0.7's versions; must match
+# python/oxarchive_backtest/packages.py (tests/test_cli.py checks).
+curated = [
+    "numpy==2.4.6",
+    "pandas==3.0.2",
+    "scipy==1.18.0",
+    "python-dateutil==2.9.0.post0",
+    "pytz==2026.1.post1",
+    "six==1.17.0",
+]
+
+[project.scripts]
+0xbt = "oxarchive_backtest.cli:main"
+
+[tool.maturin]
+module-name = "oxarchive_backtest._native"
+python-source = "python"

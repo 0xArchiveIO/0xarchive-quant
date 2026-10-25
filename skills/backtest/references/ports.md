@@ -3,9 +3,9 @@
 Port the logic, not the platform's fill behaviour. The engine's fills, fees, funding and leverage
 limits are the ones that count here; say where they differ from the original's.
 
-## Pine Script to oxs
+## Pine Script to oxb
 
-| Pine | oxs |
+| Pine | oxb |
 |---|---|
 | `close`, `open`, `high`, `low`, `volume` | `h.close.last()`, ..., `h.volume.last()` (a `Series`, one value per market) |
 | `close[n]` | `h.close.ago(n)` or `h.shift(n).close.last()` |
