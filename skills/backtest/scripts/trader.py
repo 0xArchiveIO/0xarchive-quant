@@ -322,7 +322,7 @@ def cmd_replicate(args):
     try:
         import oxarchive_backtest as oxb
     except ImportError:
-        raise SystemExit("replicate needs the engine: pip install <skill dir>/engine/crates/py") from None
+        raise SystemExit('replicate needs the engine: pip install "0xarchive-backtest[curated]"') from None
     from oxarchive_backtest import study
 
     config = oxb.Config(**_pairs(args.config))

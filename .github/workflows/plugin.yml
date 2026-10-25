@@ -1,0 +1,42 @@
+# Manifests parse, and every place that names the engine version agrees.
+name: Plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Manifests and versions
+        run: |
+          python - <<'PY'
+          import json, pathlib, re, sys
+          plugin = json.loads(pathlib.Path(".claude-plugin/plugin.json").read_text())
+          market = json.loads(pathlib.Path(".claude-plugin/marketplace.json").read_text())
+          assert any(p["name"] == plugin["name"] for p in market["plugins"]), "marketplace lists the plugin"
+          engine = "skills/backtest/engine"
+          found = {
+              "ENGINE_VERSION": re.search(r'ENGINE_VERSION: &str = "(.+?)"',
+                                          pathlib.Path(f"{engine}/crates/engine/src/lib.rs").read_text()),
+              "pyproject.toml": re.search(r'(?m)^version = "(.+?)"',
+                                          pathlib.Path(f"{engine}/crates/py/pyproject.toml").read_text()),
+              "SKILL.md pin": re.search(r'0xarchive-backtest\[curated\]==([0-9.]+)',
+                                        pathlib.Path("skills/backtest/SKILL.md").read_text()),
+          }
+          versions = {k: m.group(1) if m else None for k, m in found.items()}
+          print(versions)
+          sys.exit(len(set(versions.values())) != 1 or None in versions.values())
+          PY
+      - name: Claude Code accepts the marketplace
+        run: npx -y @anthropic-ai/claude-code plugin validate .

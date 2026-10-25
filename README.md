@@ -5,7 +5,7 @@
   <img alt="0xArchive backtest skill: reverse engineer any trader, test any idea. A strategy's equity curve beating 12 random books." src="assets/readme/hero-light.png" width="800">
 </picture>
 
-<img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="works with: Claude Code · Codex" src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="engine: Rust" src="https://img.shields.io/badge/engine-Rust-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="data: Hyperliquid · Lighter" src="https://img.shields.io/badge/data-Hyperliquid_·_Lighter-21C55E?style=flat-square&labelColor=3a3a37">
+<a href="https://github.com/0xArchiveIO/0xarchive-quant/actions/workflows/engine.yml"><img alt="engine tests" src="https://img.shields.io/github/actions/workflow/status/0xArchiveIO/0xarchive-quant/engine.yml?branch=main&style=flat-square&label=tests&labelColor=3a3a37"></a> <a href="https://pypi.org/project/0xarchive-backtest/"><img alt="PyPI: 0xarchive-backtest" src="https://img.shields.io/pypi/v/0xarchive-backtest?style=flat-square&label=pypi&labelColor=3a3a37&color=21C55E"></a> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="works with: Claude Code · Codex" src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="engine: Rust" src="https://img.shields.io/badge/engine-Rust-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="data: Hyperliquid · Lighter" src="https://img.shields.io/badge/data-Hyperliquid_·_Lighter-21C55E?style=flat-square&labelColor=3a3a37">
 
 [Install](#install) · [How it works](#how-it-works) · [The verdict](#the-verdict) · [Showcases](#showcases) · [Market data skill](#market-data-skill-0xarchive) · [Docs](https://docs.0xarchive.io)
 
@@ -40,21 +40,32 @@ Hand your coding agent a wallet, a trading idea, a Pine script, a paper or someo
 ## Install
 
 ```bash
-git clone https://github.com/0xArchiveIO/0xarchive-quant.git
+# Claude Code: both skills, as one plugin
+claude plugin marketplace add 0xArchiveIO/0xarchive-quant
+claude plugin install 0xarchive@0xarchive-quant
 
-# Claude Code (Codex: .agents/skills instead)
-mkdir -p .claude/skills
-cp -R 0xarchive-quant/skills/backtest .claude/skills/0xarchive-backtest
-
-# The engine: Rust, built once (needs cargo, https://rustup.rs)
-pip install ".claude/skills/0xarchive-backtest/engine/crates/py[curated]"
+# The engine: prebuilt for macOS, Linux and Windows (Python 3.12+)
+pip install "0xarchive-backtest[curated]"
 
 # Data, with your key
 export OXARCHIVE_API_KEY="0xa_your_api_key"
 0xbt data pull --markets BTC,ETH,SOL --from 2025-06 --to 2026-09
 ```
 
-Then ask in Claude Code with `/0xarchive-backtest`, or in Codex with `$0xarchive-backtest`. Free keys read the last 30 days; longer backtests need a [paid plan](https://www.0xarchive.io/pricing).
+Then ask with `/0xarchive:0xarchive-backtest`. Free keys read the last 30 days; longer backtests need a [paid plan](https://www.0xarchive.io/pricing).
+
+<details>
+<summary>Codex, or Claude Code without the plugin</summary>
+
+```bash
+git clone https://github.com/0xArchiveIO/0xarchive-quant.git
+mkdir -p .claude/skills      # Codex: .agents/skills
+cp -R 0xarchive-quant/skills/backtest .claude/skills/0xarchive-backtest
+```
+
+Then ask with `/0xarchive-backtest` in Claude Code or `$0xarchive-backtest` in Codex.
+
+</details>
 
 ## How it works
 
@@ -110,6 +121,8 @@ The original skill: one authenticated request to one live market-data answer, wi
 0xArchive is granular market data infrastructure for two venues: Hyperliquid and Lighter. Hyperliquid includes core perps, HIP-3 builder perps, HIP-4 outcome markets, and Hyperliquid Spot; HIP-3, HIP-4, and Spot stay under the Hyperliquid namespace. Lighter has two deployments: mainnet (`/v1/lighter`) and Robinhood Chain (`/v1/rh-lighter`, USDG-quoted perps and spot such as `AAPL-USDG`). Account positions are available on Hyperliquid core, HIP-3, and both Lighter deployments.
 
 Use this skill when Claude Code, ChatGPT Codex, or another local skill-capable coding agent needs the fastest route from `X-API-Key` to one live market-data answer. Use [AI Clients](https://docs.0xarchive.io/ai-clients) to choose between skills, MCP, CLI, markdown docs, `llms.txt`, OpenAPI, and other Claude Code or ChatGPT Codex routes.
+
+The Claude Code plugin from [Install](#install) already includes it as `/0xarchive:0xarchive`. To add it on its own:
 
 ```bash
 git clone https://github.com/0xArchiveIO/0xarchive-quant.git

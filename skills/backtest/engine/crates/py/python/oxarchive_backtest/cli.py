@@ -67,7 +67,7 @@ from . import evaluate as _evaluate
 from . import run as _run
 from . import study as _study
 from ._determinism import DeterminismWarning
-from ._native import _write_hourly
+from ._native import _write_hourly, engine_version
 
 
 def _value(text):
@@ -451,6 +451,7 @@ def _run_args(p):
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="0xbt", description="0xArchive backtest engine")
+    parser.add_argument("--version", action="version", version=f"0xbt {engine_version()}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("check", help="check imports and determinism")

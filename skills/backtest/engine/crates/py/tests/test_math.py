@@ -8,6 +8,7 @@ Run: python -m pytest crates/py/tests  (after installing the wheel)
 import math
 import pathlib
 import struct
+import sys
 import warnings
 
 import pytest
@@ -62,7 +63,8 @@ def test_unary_raises_and_special_values_like_cpython(name):
         assert a[0] == b[0], f"{name}({x!r}): {a} vs CPython {b}"
         if a[0] == "ok":
             assert close(a[1], b[1]), f"{name}({x!r}): {a[1]!r} vs CPython {b[1]!r}"
-        elif a[0] == "ValueError" and name not in ("exp2",):
+        # The messages are 3.14's; older CPython words them differently.
+        elif a[0] == "ValueError" and name not in ("exp2",) and sys.version_info >= (3, 14):
             assert a[1] == b[1], f"{name}({x!r}) message"
 
 

@@ -1,0 +1,17 @@
+{
+  "name": "0xarchive-quant",
+  "description": "0xArchive's skills for coding agents: quant research and backtesting, and live market data for Hyperliquid and Lighter.",
+  "owner": {
+    "name": "0xArchive",
+    "url": "https://www.0xarchive.io"
+  },
+  "plugins": [
+    {
+      "name": "0xarchive",
+      "source": "./",
+      "description": "Two skills: 0xarchive-backtest (reverse engineer any trader, test any idea, with a deterministic Rust backtester, a trial ledger, a sealed holdout and a verdict you can rerun) and 0xarchive (live and historical market data for Hyperliquid and Lighter).",
+      "category": "finance",
+      "homepage": "https://www.0xarchive.io/github-skill"
+    }
+  ]
+}

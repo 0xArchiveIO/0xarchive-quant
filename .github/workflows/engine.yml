@@ -1,0 +1,120 @@
+# The backtest engine: Rust tests on every OS, a wheel per platform with the
+# Python tests run against it, and on an engine-vX.Y.Z tag, a PyPI release.
+name: Engine
+
+on:
+  push:
+    branches: [main]
+    tags: ["engine-v*"]
+    paths:
+      - "skills/backtest/engine/**"
+      - ".github/workflows/engine.yml"
+  pull_request:
+    paths:
+      - "skills/backtest/engine/**"
+      - ".github/workflows/engine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ENGINE: skills/backtest/engine
+  MANIFEST: skills/backtest/engine/crates/py/Cargo.toml
+
+jobs:
+  rust:
+    name: Rust tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: skills/backtest/engine
+      # Release, as shipped: the math crate's golden values must match bit for bit.
+      - run: cargo test --release --locked
+        working-directory: ${{ env.ENGINE }}
+
+  wheels:
+    name: Wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, runner: ubuntu-latest, target: x86_64, test: true }
+          - { name: linux-aarch64, runner: ubuntu-latest, target: aarch64, test: false }
+          - { name: macos-arm64, runner: macos-latest, target: aarch64, test: true }
+          - { name: macos-x86_64, runner: macos-15-intel, target: x86_64, test: true }
+          - { name: windows-x64, runner: windows-latest, target: x64, test: true }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      # abi3: one wheel per platform serves Python 3.11 and later.
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --locked --out dist -m ${{ env.MANIFEST }}
+          manylinux: auto
+      # The whole Python suite against the built wheel, not the source tree.
+      # Tests that need the 62-market dataset skip here.
+      - name: Test the wheel
+        if: matrix.test
+        run: |
+          python -m venv .venv
+          if [ -d .venv/Scripts ]; then source .venv/Scripts/activate; else source .venv/bin/activate; fi
+          wheel=$(ls dist/*.whl)
+          pip install -q "${wheel}[curated]" pytest
+          0xbt --version
+          python -I -m pytest -q -p no:cacheprovider "$ENGINE/crates/py/tests"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheel-${{ matrix.name }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m ${{ env.MANIFEST }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sdist
+          path: dist
+
+  publish:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/engine-v')
+    needs: [rust, wheels, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/0xarchive-backtest/
+    permissions:
+      id-token: write # trusted publishing: no token stored in the repo
+    steps:
+      - uses: actions/checkout@v6
+      - name: The tag names the package version
+        run: |
+          want="${GITHUB_REF_NAME#engine-v}"
+          have=$(sed -n 's/^version = "\(.*\)"/\1/p' "$ENGINE/crates/py/pyproject.toml")
+          [ "$want" = "$have" ] || { echo "tag $GITHUB_REF_NAME, pyproject $have"; exit 1; }
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
