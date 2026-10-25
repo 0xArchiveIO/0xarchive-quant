@@ -1,11 +1,11 @@
 {
   "name": "0xarchive",
-  "description": "Agent-ready 0xArchive market data skill for coding-agent clients across two venues: Hyperliquid and Lighter. Hyperliquid includes HIP-3 builder perps, HIP-4 outcome markets, and Hyperliquid Spot; Lighter has two deployments, mainnet and Robinhood Chain. Covers account positions by Hyperliquid wallet or Lighter account index. REST and WebSocket support are route-specific and listed by GET /v1/capabilities; Lighter orderbook, trades, open interest, and funding stream live on both deployments, while Lighter candles and L3 are replay-only; L4 channels stream live and replay on Hyperliquid core, HIP-3, HIP-4, and Spot. Covers stable error codes, has_more pagination, and the 0xArchive-Version header.",
-  "version": "1.16.0",
+  "description": "Agent-ready 0xArchive market data skill for coding-agent clients across two venues: Hyperliquid and Lighter. Hyperliquid includes HIP-3 builder perps, HIP-4 outcome markets, and Hyperliquid Spot; Lighter has two deployments, mainnet and Robinhood Chain. Covers account positions by Hyperliquid wallet or Lighter account index. REST and WebSocket support are route-specific and listed by GET /v1/capabilities; Lighter orderbook, trades, open interest, and funding stream live on both deployments, while Lighter candles and L3 are replay-only; L4 channels stream live and replay on Hyperliquid core, HIP-3, HIP-4, and Spot. Covers stable error codes, has_more pagination, and the 0xArchive-Version header. Also ships 0xarchive-backtest: a quant research and backtesting workflow (route a wallet, idea, script, paper or backtest; trial ledger, sealed holdout, gauntlet verdict) on its own Rust engine, 0xbt.",
+  "version": "1.17.0",
   "author": {
     "name": "0xArchive"
   },
-  "repository": "https://github.com/0xArchiveIO/0xarchive-skill",
+  "repository": "https://github.com/0xArchiveIO/0xarchive-quant",
   "license": "MIT",
   "keywords": [
     "crypto",
@@ -17,6 +17,8 @@
     "agents",
     "claude-code",
     "codex",
-    "agent-skills"
+    "agent-skills",
+    "backtesting",
+    "quant"
   ]
 }
