@@ -14,7 +14,7 @@ much of its book a candidate strategy reproduces.
         short time, size, maker share, when it opens (UTC hour and weekday), realized PnL.
 
     trader.py replicate trader.json CANDIDATE.py --start DATE --end DATE [--data DIR]
-              [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock 1h]
+              [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock auto]
         Backtests the trader's book (templates/mirror.py) and the candidate over the same
         window, then compares them hour by hour: how many of the trader's held hours the
         candidate is on the same side, on the other side, or flat, and how much of the
@@ -381,7 +381,8 @@ def main(argv=None):
     f.add_argument("--start", required=True)
     f.add_argument("--end", required=True)
     f.add_argument("--data", default="data/hyperliquid")
-    f.add_argument("--clock", default="1h", help="the mirror's clock (default 1h)")
+    f.add_argument("--clock", default="auto",
+                   help="the mirror's clock (default auto: from their median holding time)")
     f.add_argument("--mirror", help="the mirror strategy file (default: mirror.py beside this script)")
     f.add_argument("-p", "--param", action="append", metavar="NAME=VALUE")
     f.add_argument("-c", "--config", action="append", metavar="NAME=VALUE")
