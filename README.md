@@ -26,8 +26,6 @@ Hand your coding agent a wallet, a trading idea, a Pine script, a paper or someo
 
 </div>
 
-<sub>A real run: the engine's momentum example, 2025-03 to 2026-07, through `0xbt gauntlet`. It beats every null and holds out of sample, but four tries is enough for luck to explain a Sharpe like its own, so the verdict stops at rung 4.</sub>
-
 ## Highlights
 
 - **Reverse engineer any trader.** Pull a wallet's fills, profile its style, ask whether it was skill or luck, and score candidate rules by how much of the book they reproduce.
