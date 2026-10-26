@@ -18,9 +18,11 @@ python3 trader.py profile trader.json
 ```
 
 - `fetch` reads `GET /v1/hyperliquid/wallets/{address}/positions/changes`: one row per fill that changed
-  a position, signed (shorts negative), from 2025-05-25 on Hyperliquid core. `--venue hip3` and
-  `--venue lighter` (account index) read the same route on those venues, but the backtest dataset is
-  Hyperliquid core only, so the mirror covers core markets alone.
+  a position, signed (shorts negative), from 2025-05-25 on Hyperliquid core. `--venue hip3` reads the
+  wallet's HIP-3 positions (from 2025-10-13), and `--venue hyperliquid,hip3` merges both into one book,
+  which is what to pull for a wallet that trades both: the mirror trades core and HIP-3 markets.
+  Pull the HIP-3 markets' data with their `dex:COIN` names (data.md). `--venue lighter` (account
+  index) reads Lighter, which the backtest dataset doesn't have.
 - It bills like trades, one credit per 1,000 rows. A busy wallet over a year can be hundreds of thousands
   of rows: try one month first and tell the user the row count before pulling a year.
 - The Free plan reads only the last 30 days. A `historical_depth_exceeded` error means the window needs

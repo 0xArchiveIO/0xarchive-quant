@@ -68,6 +68,11 @@ class Source:
 
     @staticmethod
     def _scan(root):
+        """{market: [months]}. A folder of months is a core market; a folder of folders
+        is a HIP-3 dex, whose markets are named dex:coin (xyz/CL/ is xyz:CL)."""
+        def months(d):
+            return sorted(f[:-8] for f in os.listdir(d) if f.endswith(".parquet"))
+
         out = {}
         if not os.path.isdir(root):
             return out
@@ -75,9 +80,13 @@ class Source:
             d = os.path.join(root, m)
             if m.startswith(".") or not os.path.isdir(d):
                 continue
-            months = sorted(f[:-8] for f in os.listdir(d) if f.endswith(".parquet"))
-            if months:
-                out[m] = months
+            if mo := months(d):
+                out[m] = mo
+                continue
+            for c in sorted(os.listdir(d)):
+                if not c.startswith(".") and os.path.isdir(os.path.join(d, c)):
+                    if mo := months(os.path.join(d, c)):
+                        out[f"{m}:{c}"] = mo
         return out
 
     def index(self, hourly=False):
@@ -111,7 +120,7 @@ class Source:
             months = [x for x in idx[m] if x in span]
             want.append((m, months))
             for mo in months:
-                rel = f"{m}/{mo}.parquet"
+                rel = f"{m.replace(':', '/', 1)}/{mo}.parquet"
                 part = self._have.get(f"{'hourly' if hourly else 'minute'}/{rel}")
                 if not os.path.exists(os.path.join(root, rel)) or (
                     part is not None and (columns is None or not set(columns) <= part | {"ts"})
@@ -120,7 +129,7 @@ class Source:
         if missing:
             raise MissingData(missing)
         return [
-            (m, _native.load(os.path.join(root, m), columns=columns, stream=True,
+            (m, _native.load(market_dir(root, m), columns=columns, stream=True,
                              months=(months[0], months[-1]) if months else ("0", "0")))
             for m, months in want
         ]  # fmt: skip
@@ -135,6 +144,12 @@ class Source:
 
     def __repr__(self):
         return f"Source({self.root!r})"
+
+
+def market_dir(root, market):
+    """A market's folder under `root`: BTC is root/BTC, the HIP-3 market xyz:CL is
+    root/xyz/CL."""
+    return os.path.join(root, *market.split(":", 1))
 
 
 def _source(source):
