@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/hero-dark.png">
-  <img alt="0xArchive backtest skill: reverse engineer any trader, test any idea. A strategy's equity curve beating 12 random books." src="assets/readme/hero-light.png" width="800">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/hero-dark.svg">
+  <img alt="0xArchive backtest skill: reverse engineer any trader, test any idea. A strategy's equity curve beating 12 random books." src="assets/readme/hero-light.svg" width="800">
 </picture>
 
 <a href="https://github.com/0xArchiveIO/0xarchive-quant/actions/workflows/engine.yml"><img alt="engine tests" src="https://img.shields.io/github/actions/workflow/status/0xArchiveIO/0xarchive-quant/engine.yml?branch=main&style=flat-square&label=tests&labelColor=3a3a37"></a> <a href="https://pypi.org/project/0xarchive-backtest/"><img alt="PyPI: 0xarchive-backtest" src="https://img.shields.io/pypi/v/0xarchive-backtest?style=flat-square&label=pypi&labelColor=3a3a37&color=21C55E"></a> <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="works with: Claude Code · Codex" src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="engine: Rust" src="https://img.shields.io/badge/engine-Rust-21C55E?style=flat-square&labelColor=3a3a37"> <img alt="data: Hyperliquid · Lighter" src="https://img.shields.io/badge/data-Hyperliquid_·_Lighter-21C55E?style=flat-square&labelColor=3a3a37">
