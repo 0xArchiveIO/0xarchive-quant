@@ -5,10 +5,27 @@ month. Columns the API has no minute form of are null in these files: the book c
 liquidation levels below. Context columns (OI, mark, funding) are the API's 1-minute averages rather than
 the last snapshot.
 
-Files are `<MARKET>/<YYYY-MM>.parquet`, one row per minute, Hyperliquid core perps. Every value is known at the minute's close (no lookahead); a minute with no trades has null
+Files are `<MARKET>/<YYYY-MM>.parquet`, one row per minute, Hyperliquid core perps and HIP-3 builder
+perps. Every value is known at the minute's close (no lookahead); a minute with no trades has null
 prices, not a carried value. A strategy reads these as fields on `h` (`h.funding_rate`, `h.cvd_delta`),
 resampled to its bars: prices take first/max/min/last, volumes and counts sum, state columns take the
 last value.
+
+**HIP-3 markets** are named as the API names them, `dex:COIN` (`xyz:CL`, `xyz:XYZ100`), and pulled
+the same way: `0xbt data pull --markets xyz:CL,BTC ...`. Their files sit one folder deeper
+(`xyz/CL/<YYYY-MM>.parquet`), since a colon can't be in a Windows path; strategies and `Source` use
+the `xyz:CL` name. Tickers are case-sensitive (`kPEPE`), so type them as Hyperliquid does. Four
+differences from core:
+
+- Coverage starts later and varies by market: prices and taker flow from 2025-10-13 at the earliest,
+  open interest and funding from 2026-02-16, liquidations from 2025-12-22 or later. Months before a
+  market's prices are skipped as usual. Funding before 2026-02-16 is null, so a backtest there pays none.
+- Deployers set HIP-3 fees, and they are commonly double core's. The run's fees are one setting for
+  every market, so cost a HIP-3-heavy book with `-c taker_fee_bps=9 -c maker_fee_bps=3` and say so.
+- Leverage limits are lower than BTC's 40x on most HIP-3 markets: pass `--max-leverage xyz:CL=X`
+  when a strategy runs near its limit.
+- Liquidation volume is zero-filled from 2025-12-22 as on core, but some HIP-3 markets' coverage
+  starts later (`xyz:CL` on 2026-01-06), so zeros before a market's own start are not evidence.
 
 | Family | Columns | From |
 |---|---|---|
@@ -32,9 +49,9 @@ Not every market covers every month: newer listings start when they listed. `oxb
 
 Say "not testable with our data" for an idea that needs any of these, and say which:
 
-- Other venues in a backtest (HIP-3, HIP-4, Spot, Lighter), and anything off Hyperliquid (CEX prices,
-  options, on-chain flows, news, social data). The API has HIP-3, HIP-4, Spot and Lighter data for
-  research reads (the `0xarchive` skill), but the engine trades Hyperliquid core perps only.
+- Other venues in a backtest (HIP-4, Spot, Lighter), and anything off Hyperliquid (CEX prices,
+  options, on-chain flows, news, social data). The API has HIP-4, Spot and Lighter data for
+  research reads (the `0xarchive` skill), but the engine trades Hyperliquid core and HIP-3 perps only.
 - Individual orders or the full book at a level (only the summaries above). The API's L4 and L2 routes
   have them for research.
 - Per-wallet data inside a strategy. A trader's own book comes in through `trader.py` and the mirror

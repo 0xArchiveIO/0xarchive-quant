@@ -17,6 +17,9 @@
 //!   0xbt-build-api build --coin BTC --from 2026-10 --to 2026-10 --until 1791300000000 --out recent
 //!   (a month to date: rows stop before --until, ms; keep it out of the published dataset,
 //!   since candles are rewritten for up to 24 h)
+//!   0xbt-build-api build --coin xyz:CL --from 2026-01 --to 2026-09 --out data
+//!   (a HIP-3 market, named dex:coin as the API names it: read from /v1/hyperliquid/hip3
+//!   and written to data/hyperliquid/xyz/CL/, since a colon can't be in a Windows path)
 //!   0xbt-build-api check --dir data/hyperliquid/BTC
 //!   0xbt-build-api manifest --dir data        (writes data/manifest.json; see manifest.rs)
 
@@ -298,6 +301,7 @@ impl Api {
 /// The most rows one request returns, by endpoint (measured 2026-10-07; larger `limit`s
 /// are cut to these).
 fn page_cap(path: &str) -> i64 {
+    let path = path.strip_prefix("hip3/").unwrap_or(path);
     if path.starts_with("candles/") || path.ends_with("/flow") {
         10_000
     } else if path.starts_with("cvd/") {
@@ -336,7 +340,12 @@ fn build(
     // The candles route refuses a range that ends before 2025-03-22 12:00 UTC and clamps
     // one that straddles it, so each page-sized window starts there at the earliest.
     let candles_start = date_ms(Source::Fills.hyperliquid_perp_start())? + 12 * HOUR_MS;
-    let dir = out.join("hyperliquid").join(coin);
+    // A HIP-3 market (dex:coin) reads the same routes under hip3/ and lives one folder
+    // deeper, hyperliquid/<dex>/<coin>/.
+    let (route, dir) = match coin.split_once(':') {
+        Some((dex, name)) => ("hip3/", out.join("hyperliquid").join(dex).join(name)),
+        None => ("", out.join("hyperliquid").join(coin)),
+    };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
     for ym in months(from, to)? {
@@ -353,15 +362,15 @@ fn build(
         }
         let [candles, cvd, flow, oi, funding, liqs]: [HashMap<i64, Value>; 6] = api
             .buckets(&[
-                (format!("candles/{coin}"), start.max(candles_start), end),
-                (format!("cvd/{coin}"), start, end),
-                (format!("orders/{coin}/flow"), start.max(orders_start), end),
-                (format!("openinterest/{coin}"), start, end),
+                (format!("{route}candles/{coin}"), start.max(candles_start), end),
+                (format!("{route}cvd/{coin}"), start, end),
+                (format!("{route}orders/{coin}/flow"), start.max(orders_start), end),
+                (format!("{route}openinterest/{coin}"), start, end),
                 // One extra minute before the month, for the first hour's settlement.
-                (format!("funding/{coin}"), start - BUCKET_MS, end),
+                (format!("{route}funding/{coin}"), start - BUCKET_MS, end),
                 // The API refuses ranges that end before a source's first date.
                 (
-                    format!("liquidations/{coin}/volume"),
+                    format!("{route}liquidations/{coin}/volume"),
                     start.max(liq_start),
                     end,
                 ),
