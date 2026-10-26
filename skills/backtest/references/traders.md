@@ -44,8 +44,9 @@ book they were.
 ```
 
 The mirror holds their signed position value in each market, scaled by their largest gross position so
-the book never passes 1x, and samples it each hour (`-p clock=1m` follows within a minute and runs
-slower). Its nulls read as questions about the trader:
+the book never passes 1x, and samples it on a clock picked from their median holding time (the
+coarsest of 1h, 15m, 5m and 1m that is at most a tenth of it; `-p clock=1h` fixes it). Its nulls
+read as questions about the trader:
 
 - **flipped:** fading them. If fading does as well, the book has no direction to speak of.
 - **random:** random positions in the same markets on the same clock: what the markets alone paid.
@@ -54,7 +55,9 @@ slower). Its nulls read as questions about the trader:
 
 The mirror's PnL is not their PnL: it trades up to a clock tick late, at our fill model's prices, at a
 fixed scale. Compare it with `realized_pnl` from the profile and say how far apart they are. A big gap
-usually means fast trading the hourly mirror can't follow; rerun with `clock=1m`.
+usually means fast trading the mirror's clock can't follow (rerun with `clock=1m`), or a maker book:
+the mirror takes liquidity a minute after their fill, so a wallet that earns by resting orders
+(the profile's `maker_share`) looks worse in the mirror than it did on the venue. Say so.
 
 ## 3. Find the rules
 
