@@ -14,16 +14,25 @@ last value.
 |---|---|---|
 | Price and volume | `open`, `high`, `low`, `close`, `volume`, `quote_volume`, `trade_count`, `vwap` | 2025-03-22 |
 | Taker flow | `taker_buy_quote`, `taker_sell_quote`, `cvd_delta` | 2025-03-22 |
-| Book (null when pulled from the API) | `best_bid`, `best_ask`, `spread_bps`, `spread_bps_mean`, `depth_bid_10bps`, `depth_ask_10bps`, `depth_bid_50bps`, `depth_ask_50bps`, `imbalance_10bps`, `book_snapshots` | 2023-04-15 |
+| Book | `best_bid`, `best_ask`, `spread_bps`, `spread_bps_mean`, `depth_bid_10bps`, `depth_ask_10bps`, `depth_bid_50bps`, `depth_ask_50bps`, `imbalance_10bps`, `book_snapshots` | never: null in every file (below) |
 | Market context | `open_interest`, `mark_price`, `oracle_price`, `mid_price`, `impact_bid`, `impact_ask`, `funding_rate` (hourly estimate, a fraction), `premium`, `funding_settled` (the rate paid, on settlement minutes only) | 2023-05-20 |
 | Liquidations | `liq_long_usd`, `liq_short_usd`, `liq_long_count`, `liq_short_count` | 2025-12-22 |
 | Order activity | `limit_orders_placed`, `orders_canceled`, `orders_filled`, `trigger_orders_placed`, `tpsl_orders_placed`, `orders_triggered`, `orders_force_canceled` | 2026-03-10 |
-| Liquidation levels (null when pulled from the API) | `liq_levels_long_1pct_usd`, `liq_levels_short_1pct_usd`, `liq_levels_age_ms` | 2026-07-27 |
+| Liquidation levels | `liq_levels_long_1pct_usd`, `liq_levels_short_1pct_usd`, `liq_levels_age_ms` | never: null in every file (below) |
 
 Backtests that trade need prices, so the earliest trading window starts 2025-03-22 whatever else the
 strategy reads. A strategy reading liquidations can't start before 2025-12-22; one reading order activity,
-not before 2026-03-10. Liquidation levels start inside the default holdout, so they can't be tested in a
-study yet: say so.
+not before 2026-03-10.
+
+**The book and liquidation-level columns are in the schema but null in every file `0xbt data pull`
+builds, for every market and every month.** The API has no 1-minute form of either, so there is nothing
+to fill them from. The depth bands (`depth_*_10bps`, `depth_*_50bps`, `imbalance_10bps`) would stay null
+even with one: Hyperliquid's L2 book carries 20 levels a side, which on a liquid market spans only a few
+bps (about 2.5 on BTC), so a ±10 or ±50 bps band can't be measured, and summing the 20 levels would
+understate the real depth. A strategy reading any of these columns reads nulls: say the idea is not
+testable with our data. The fill model takes its slippage from depth when a row has it, so in every
+backtest it uses the fixed fallback, `Config.fallback_slippage_bps` (2 bps; raise it with
+`-c fallback_slippage_bps=5` to stress costs).
 
 Not every market covers every month: newer listings start when they listed. `oxb.Source(DIR).markets()` lists them. Point-in-time universes need the hourly bars
 (`0xbt hourly --data DIR`).

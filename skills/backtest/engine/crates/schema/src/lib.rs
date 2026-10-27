@@ -1,6 +1,6 @@
-//! The 1-minute dataset row, shared by the builder, the live stream and the engine.
+//! The 1-minute dataset row, shared by the dataset builder and the engine.
 //!
-//! The source of truth for column meaning is `docs/dataset-schema.md`. Every column
+//! Column meanings and coverage are in the skill's `references/data.md`. Every column
 //! is known by the bucket's close; `None` means the source had no data, never zero.
 
 pub const SCHEMA_VERSION: &str = "1m-v0";
@@ -102,7 +102,7 @@ impl Source {
         Source::LiqLevels,
     ];
 
-    /// First UTC date each source exists for Hyperliquid perps, per `get_data_coverage`
+    /// First UTC date each source exists for Hyperliquid perps, per the API's coverage
     /// on 2026-10-06. Rows before it have every column of that source null.
     pub fn hyperliquid_perp_start(self) -> &'static str {
         match self {
