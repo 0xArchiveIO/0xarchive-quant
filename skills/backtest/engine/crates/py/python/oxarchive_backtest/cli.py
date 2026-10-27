@@ -396,7 +396,7 @@ def cmd_data(args):
         if not markets:
             raise SystemExit(f"no markets in {args.data}")
         bad = [m for m in markets
-               if _build_api(["0xbt-build-api", "check", "--dir", os.path.join(args.data, m)])]  # fmt: skip
+               if _build_api(["0xbt-build-api", "check", "--dir", _run.market_dir(args.data, m)])]  # fmt: skip
         print(f"{len(markets) - len(bad)} of {len(markets)} markets OK" + (f"; failed: {', '.join(bad)}" if bad else ""))
         return 1 if bad else 0
     if not (os.environ.get("OXARCHIVE_API_KEY") or os.environ.get("OXA_API_KEY")):
@@ -404,7 +404,8 @@ def cmd_data(args):
     if not args.markets or not args.start_month or not args.end_month:
         raise SystemExit("data pull needs --markets, --from and --to")
     failed = []
-    for m in [x.strip().upper() for x in args.markets.split(",") if x.strip()]:
+    # Tickers are case-sensitive on Hyperliquid (kPEPE, not KPEPE), so they're used as typed.
+    for m in [x.strip() for x in args.markets.split(",") if x.strip()]:
         argv = ["0xbt-build-api", "build", "--coin", m, "--from", args.start_month, "--to",
                 args.end_month, "--out", str(root)]  # fmt: skip
         if not args.refresh:
@@ -424,7 +425,7 @@ def cmd_hourly(args):
         raise SystemExit(f"no markets in {root}")
     written = 0
     for m in markets:
-        written += _write_hourly(os.path.join(root, m), os.path.join(out, m))
+        written += _write_hourly(_run.market_dir(root, m), _run.market_dir(out, m))
     print(f"{written} hourly file(s) written to {out} for {len(markets)} markets")
     return 0
 

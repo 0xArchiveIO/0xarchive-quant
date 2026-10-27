@@ -2,7 +2,7 @@
 """Reverse engineering a trader: pull one wallet's positions, profile its style, and score how
 much of its book a candidate strategy reproduces.
 
-    trader.py fetch 0xADDRESS --start 2025-06-01 --end 2026-07-01 [--venue hyperliquid]
+    trader.py fetch 0xADDRESS --start 2025-06-01 --end 2026-07-01 [--venue hyperliquid[,hip3]]
               [--data DIR] [--out trader.json]
         Every fill that changed the wallet's positions (GET .../positions/changes), paged
         and split into 30-day requests, written as one file the mirror strategy reads.
@@ -14,7 +14,7 @@ much of its book a candidate strategy reproduces.
         short time, size, maker share, when it opens (UTC hour and weekday), realized PnL.
 
     trader.py replicate trader.json CANDIDATE.py --start DATE --end DATE [--data DIR]
-              [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock 1h]
+              [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock auto]
         Backtests the trader's book (templates/mirror.py) and the candidate over the same
         window, then compares them hour by hour: how many of the trader's held hours the
         candidate is on the same side, on the other side, or flat, and how much of the
@@ -97,11 +97,16 @@ def cmd_fetch(args):
     key = os.environ.get("OXARCHIVE_API_KEY")
     if not key:
         raise SystemExit("set OXARCHIVE_API_KEY (https://www.0xarchive.io/signup)")
-    path = PREFIX[args.venue].format(a=args.address)
+    venues = [v.strip() for v in args.venue.split(",") if v.strip()]
+    bad = [v for v in venues if v not in PREFIX]
+    if bad or not venues:
+        raise SystemExit(f"--venue: {', '.join(bad) or 'none given'}; choose from {', '.join(sorted(PREFIX))}")
     t0, t1 = ms(args.start), ms(args.end)
     rows, notices = [], set()
-    # One request window per 30 days: the Free plan's per-request span.
-    for w0 in range(t0, t1, 30 * DAY):
+    # One request window per 30 days (the Free plan's per-request span), per venue: a
+    # wallet's core and HIP-3 positions are separate routes, merged into one book.
+    for path, w0 in ((PREFIX[v].format(a=args.address), w) for v in venues
+                     for w in range(t0, t1, 30 * DAY)):
         w1 = min(w0 + 30 * DAY, t1)
         cursor = None
         while True:
@@ -143,7 +148,15 @@ def cmd_fetch(args):
             "fetched": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "max_gross_usd": gross, "changes": changes, "notices": sorted(notices)}
     if args.data:
-        have = {p.name for p in pathlib.Path(args.data).iterdir() if p.is_dir()}
+        # Core markets are folders of months; a HIP-3 dex is a folder of them (xyz/CL/).
+        have = set()
+        for p in pathlib.Path(args.data).iterdir():
+            if not p.is_dir():
+                continue
+            if any(p.glob("*.parquet")):
+                have.add(p.name)
+            have.update(f"{p.name}:{c.name}" for c in p.iterdir()
+                        if c.is_dir() and any(c.glob("*.parquet")))
         book["in_dataset"] = sorted({c["symbol"] for c in changes} & have)
     pathlib.Path(args.out).write_text(json.dumps(book) + "\n", encoding="utf-8")
     print(f"{len(changes)} position changes in {len({c['symbol'] for c in changes})} markets "
@@ -353,7 +366,9 @@ def main(argv=None):
     f.add_argument("address")
     f.add_argument("--start", required=True)
     f.add_argument("--end", required=True)
-    f.add_argument("--venue", default="hyperliquid", choices=sorted(PREFIX))
+    f.add_argument("--venue", default="hyperliquid",
+                   help="hyperliquid, hip3 or lighter; hyperliquid,hip3 merges a wallet's core "
+                        "and HIP-3 positions into one book")
     f.add_argument("--data", help="the backtest dataset, to mark which markets it has")
     f.add_argument("--out", default="trader.json")
     f.set_defaults(run=cmd_fetch)
@@ -366,7 +381,8 @@ def main(argv=None):
     f.add_argument("--start", required=True)
     f.add_argument("--end", required=True)
     f.add_argument("--data", default="data/hyperliquid")
-    f.add_argument("--clock", default="1h", help="the mirror's clock (default 1h)")
+    f.add_argument("--clock", default="auto",
+                   help="the mirror's clock (default auto: from their median holding time)")
     f.add_argument("--mirror", help="the mirror strategy file (default: mirror.py beside this script)")
     f.add_argument("-p", "--param", action="append", metavar="NAME=VALUE")
     f.add_argument("-c", "--config", action="append", metavar="NAME=VALUE")
