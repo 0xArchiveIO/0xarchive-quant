@@ -12,9 +12,10 @@
 #   stale    - their own positions at random earlier times: their book without its timing.
 # A trader whose record beats every stale run has timing, not just exposure.
 #
-# The book is sampled at each clock tick and traded from the next minute, so with the
-# default hourly clock it trades up to an hour after them. clock="1m" follows closely and
-# runs slower. A weight is traded only when it moves more than `band` (a fraction of
+# The book is sampled at each clock tick and traded from the next minute. The default
+# clock="auto" picks it from their median holding time: the coarsest of 1h, 15m, 5m and 1m
+# that is at most a tenth of it, so a fast trader is followed closely and a slow one
+# doesn't pay for ticks it doesn't need. Pass clock="1h" (or any duration) to fix it. A weight is traded only when it moves more than `band` (a fraction of
 # equity) from what is held, so price drift alone doesn't trade. Markets the dataset lacks
 # are left out; trader.py profile lists them.
 import bisect
@@ -24,9 +25,36 @@ import oxarchive_backtest as oxb
 from oxarchive_backtest import Series, x
 
 
-def strategy(path="trader.json", clock="1h", band=0.01):
+CLOCKS = (("1h", 3_600_000), ("15m", 900_000), ("5m", 300_000), ("1m", 60_000))
+
+
+def median_hold_ms(changes):
+    """Median time from a position opening to closing or flipping, over every market."""
+    holds, opened, prev = [], {}, {}
+    for c in changes:
+        m, pos = c["symbol"], c["end_position"]
+        was = prev.get(m, 0.0)
+        if was != 0 and (pos == 0 or was * pos < 0) and m in opened:
+            holds.append(c["ts"] - opened.pop(m))
+        if pos != 0 and (was == 0 or was * pos < 0):
+            opened[m] = c["ts"]
+        prev[m] = pos
+    holds.sort()
+    return holds[len(holds) // 2] if holds else None
+
+
+def auto_clock(changes):
+    hold = median_hold_ms(changes)
+    if hold is None:
+        return "1h"
+    return next((name for name, ms in CLOCKS if ms <= hold / 10), "1m")
+
+
+def strategy(path="trader.json", clock="auto", band=0.01):
     with open(path, encoding="utf-8") as f:
         book = json.load(f)
+    if clock == "auto":
+        clock = auto_clock(sorted(book["changes"], key=lambda c: c["ts"]))
     paths = {}
     for c in book["changes"]:
         ts, sizes = paths.setdefault(c["symbol"], ([], []))
