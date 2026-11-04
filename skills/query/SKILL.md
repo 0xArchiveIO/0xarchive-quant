@@ -1,11 +1,11 @@
 ---
 name: 0xarchive
-version: 1.16.0
+version: 1.17.0
 description: >
   Query historical and real-time crypto market data from 0xArchive across two venues: Hyperliquid and Lighter.
   Lighter has two deployments: mainnet at /v1/lighter and Robinhood Chain at /v1/rh-lighter (USDG-quoted, e.g. BTC, AAPL-USDG).
   Hyperliquid includes HIP-3 builder perps (/v1/hyperliquid/hip3), HIP-4 outcome markets (/v1/hyperliquid/hip4), and Spot (/v1/hyperliquid/spot, e.g. HYPE-USDC).
-  Covers orderbooks, trades, candles, funding, open interest, liquidations, account positions, outcome markets, TWAP, CVD, breadth, webhooks, and data quality; data types are route-specific.
+  Covers orderbooks, trades, candles, funding, open interest, liquidations, account positions, outcome markets, TWAP, CVD, breadth, trade intent, USDC flows, positioning, webhooks, and data quality; data types are route-specific.
   WebSocket support is channel-specific and GET /v1/capabilities lists it per venue and data type: Lighter orderbook, trades, open interest, and funding stream live on both deployments; Lighter candles and L3 are replay-only; L4 channels replay on Hyperliquid core, HIP-3, HIP-4, and Spot.
   Use in Claude Code, Codex, and SKILL.md-compatible agents for market data, orderbooks, trades, candles, funding, prices, positions, real-time streams, prediction markets, or spot pairs on Hyperliquid, HIP-3, HIP-4, Hyperliquid Spot, Lighter, or Lighter on Robinhood Chain.
 allowed-tools: Bash
@@ -137,6 +137,12 @@ Some routes add optional `meta` fields. Lighter trades (both deployments) carry 
 | `GET /cvd/{symbol}` | `start`, `end`, `interval`, `limit`, `cursor` | Cumulative volume delta; pass `meta.next_cursor` back to page |
 | `GET /breadth/above-vwap/current` | -- | Percent of eligible instruments above their UTC-session VWAP |
 | `GET /breadth/above-vwap` | `start`, `end`, `interval`, `limit`, `cursor` | Breadth history |
+| `GET /breadth/above-ma/current` | `n` (required: `5`, `20`, `50`, `200`) | Newest reading of the share of perps above their n-day moving average. Build plan and above |
+| `GET /breadth/above-ma` | `n` (required), `start`, `end`, `interval`, `limit`, `cursor` | Moving-average breadth history; each `n` starts on its own date. Build plan and above |
+| `GET /trade-intent/{symbol}` | `start`, `end`, `interval`, `limit`, `cursor` | Why the market traded, per bucket: volume of new longs and shorts, profit taken, stops and flips, market-maker volume, and the winners' and losers' aggregate position and flow. Build plan and above |
+| `GET /positioning` | `window` (required: `1h`, `4h`, `24h`) | Every listed perp's open interest change, taker flow, liquidations and typical moves over a trailing window; current window only. Build plan and above |
+| `GET /usdc-flows` | `start`, `end`, `min_usd`, `kind`, `limit`, `cursor` | Every USDC deposit, withdrawal and HyperEVM transfer, with the HyperCore account; join pages on `id`. Build plan and above |
+| `GET /usdc-flows/volume` | `start`, `end`, `interval`, `limit`, `cursor` | USDC flow totals per bucket, zeros included. Build plan and above |
 | `GET /wallets/classify` | `min_orders`, `min_volume_usd`, `uses_twap`, `uses_priority_gas`, `min_cancel_rate`, `max_cancel_rate`, `date`, `sort`, `order`, `limit`, `offset` | Classify wallets by trading behaviour |
 | `GET /liquidations/user/{address}` | `start`, `end`, `limit`, `cursor`, `coin` | Liquidations for a user |
 | `GET /freshness/{symbol}` | -- | Data freshness per data type |
@@ -180,6 +186,10 @@ Coin names are **case-sensitive** and carry the builder prefix (e.g., `xyz:SP500
 | `GET /oracle/discovery-bounds/{coin}` | -- | Current oracle price discovery bounds |
 | `GET /breadth/above-vwap/current` | -- | Percent of eligible HIP-3 instruments above session VWAP |
 | `GET /breadth/above-vwap` | `start`, `end`, `interval`, `limit`, `cursor` | HIP-3 breadth history |
+| `GET /breadth/above-ma/current` | `n` (required: `5`, `20`, `50`, `200`) | Newest share of HIP-3 perps above their n-day moving average. Build plan and above |
+| `GET /breadth/above-ma` | `n` (required), `start`, `end`, `interval`, `limit`, `cursor` | HIP-3 moving-average breadth history. Build plan and above |
+| `GET /trade-intent/{coin}` | `start`, `end`, `interval`, `limit`, `cursor` | Trade intent for one HIP-3 market. Build plan and above |
+| `GET /positioning` | `window` (required: `1h`, `4h`, `24h`) | Every active HIP-3 perp over a trailing window; current window only. Build plan and above |
 | `GET /wallets/classify` | same as Hyperliquid | Classify HIP-3 wallets by trading behaviour |
 | `GET /freshness/{coin}` | -- | Data freshness per data type |
 | `GET /summary/{coin}` | -- | Combined market summary (price, funding, OI) |
@@ -193,6 +203,15 @@ Coin names are **case-sensitive** and carry the builder prefix (e.g., `xyz:SP500
 | `GET /orderbook/{coin}/l2` | `timestamp`, `depth` | L2 full-depth orderbook derived from L4 |
 | `GET /orderbook/{coin}/l2/history` | `start`, `end`, `limit`, `cursor`, `depth` | L2 full-depth checkpoints |
 | `GET /orderbook/{coin}/l2/diffs` | `start`, `end`, `limit`, `cursor` | L2 tick-level diffs |
+
+### Build-and-above datasets
+
+Trade intent, USDC flows, breadth above the moving average, and positioning come with the Build, Pro, Scale and Enterprise plans. A Free key gets 403 `forbidden` with `datatype`, `required_plans` and `upgrade_url`, and is not charged. USDC flows bill 1 credit per 1,000 rows; the other three 1 credit per request. None has a WebSocket channel.
+
+- **Trade intent** (`/trade-intent/{symbol}` on Hyperliquid and HIP-3): `interval` is `1s`, `5s`, `15s`, `1m`, `5m`, `15m`, `1h` (default), `4h` or `1d`; `limit` up to 2,000 buckets. Hourly intervals start 2025-05-25 15:00 UTC (HIP-3 2025-10-13 12:00 UTC), minute intervals 2026-07-14, second intervals cover the last 3 days. Both sides of every trade count; market makers are in `mm_usd`. Winners and losers are aggregates over the trailing 72 hours, never wallets. A market idle for more than 7 days has no buckets: a gap, not zero. Set `start` and `end` when paging and stop when `next_cursor` is absent, even on an empty page. Buckets with `is_final: false` can still change.
+- **USDC flows** (`/usdc-flows`, `/usdc-flows/volume`, Hyperliquid only): from 2025-09-27 09:33 UTC. `kind` is `deposit`, `withdraw`, `evm_in` or `evm_out`. A page reads at most 31 days, so with a high `min_usd` it can be empty and still have `has_more: true`: stop on the cursor, not on a short page. Events in the last 3 hours can still be added; re-read that span and deduplicate on `id`. `/volume` refuses `min_usd` and `kind`.
+- **Breadth above the moving average** (`/breadth/above-ma` and `/current` on Hyperliquid and HIP-3): `n` is required. Each bucket carries its last reading; never average `value_pct`. `coverage_ratio` depends on `n` and is not comparable with above-VWAP breadth. Starts: Hyperliquid n=5 2025-03-27, n=20 2025-04-11, n=50 2025-05-11, n=200 2025-10-08; HIP-3 2025-12-27, 2026-01-11, 2026-02-10, 2026-07-10.
+- **Positioning** (`/positioning` on Hyperliquid and HIP-3): `window` is required, and any other parameter is refused; there is no history. One record per market, sorted by symbol; `meta.as_of` is the 5-minute close the records describe. `oi_*` and `mark_*` are null when a bucket has no reading, never 0; `typical_*` are null under 288 counted windows.
 
 ### HIP-4 (`/v1/hyperliquid/hip4`)
 
@@ -642,7 +661,7 @@ done
 
 ## Tier Limits
 
-Every tier, Free included, has every data type, symbol, order book depth, Lighter granularity (including `tick`), and WebSocket channel. Tiers differ in credits, history window, request rate, and connection limits.
+Every tier, Free included, has every symbol, order book depth, Lighter granularity (including `tick`), WebSocket channel and data type, with two exceptions: the live `mempool` channel on `wss://stream.0xarchive.io/ws` comes with Pro, Scale and Enterprise, and trade intent, USDC flows, breadth above the moving average and positioning come with Build, Pro, Scale and Enterprise. Tiers otherwise differ in credits, history window, request rate, and connection limits.
 
 | Tier | Price | Credits | Historical Depth | Rate Limit |
 |------|-------|---------|------------------|------------|
@@ -675,7 +694,7 @@ Errors return JSON with a stable `error_code`. Branch on `error_code` and the HT
 | `historical_depth_exceeded` | 403 | Older than the plan's history window (Free: rolling 30 days) | Move the window forward or upgrade |
 | `historical_range_exceeded` | 403 | The span exceeds the plan's per-request limit | Split into smaller windows |
 | `unauthorized` | 401 | Missing or invalid API key | Set `$OXARCHIVE_API_KEY` |
-| `forbidden` | 403 | The key or account may not make this request | Check the key status and account; do not retry unchanged |
+| `forbidden` | 403 | The key or account may not make this request, or the plan does not include the dataset (`datatype`, `required_plans`, `upgrade_url` in the body) | Check the key status and account, or change plan; do not retry unchanged |
 | `unsupported_for_venue` | 404 | This venue does not offer the data type | Use a route from `available_on` in the body, or check `GET /v1/capabilities` |
 | `route_not_found` | 404 | No such route | Check the path; `GET /v1/capabilities` lists each venue's routes |
 | `not_found` | 404 | The resource id does not exist (for example an outcome or incident id) | Check the id |
