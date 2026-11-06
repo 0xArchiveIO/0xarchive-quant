@@ -13,6 +13,14 @@ much of its book a candidate strategy reproduces.
         The style, from the fills alone: markets, round trips, holding times, long and
         short time, size, maker share, when it opens (UTC hour and weekday), realized PnL.
 
+        Includes "scaling": orders per round trip, where each add sits against the first
+        fill and its size against what was held, and the exit against the average entry.
+
+    trader.py entries trader.json [--data DIR] [--lengths 6,8,12,14,16,20,24,48,72]
+        Which reference level the opening fills track: each one measured against hourly
+        EMAs (closed and live), SMAs and the session VWAP, ranked by how tightly the
+        offsets cluster. Reads the backtest dataset; needs the 0xarchive-backtest wheel.
+
     trader.py replicate trader.json CANDIDATE.py --start DATE --end DATE [--data DIR]
               [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock 1h]
         Backtests the trader's book (templates/mirror.py) and the candidate over the same
@@ -21,7 +29,7 @@ much of its book a candidate strategy reproduces.
         trader's daily returns (in the engine, after costs) it tracks. Needs the 0xarchive-backtest
         wheel. Both runs go into an active study's ledger as trials.
 
-fetch and profile use only the standard library.
+fetch and profile use only the standard library; entries and replicate need the engine.
 """
 
 import argparse
@@ -155,6 +163,98 @@ def cmd_fetch(args):
     return 0
 
 
+def _q(xs, f):
+    xs = sorted(xs)
+    return xs[int(f * (len(xs) - 1))]
+
+
+def scaling(book, join_bp=5.0, join_minutes=10):
+    """How a book scales into and out of each round trip: entries per trip, where each
+    add sits against the first fill, its size against what was held, and where the
+    position closes against its average entry.
+
+    Fills that add to a position at one price (within join_bp) and close in time (within
+    join_minutes of the order's first fill) count as one order, since a resting limit
+    often fills in pieces. Moves are signed by the trip's side, so for a long and a
+    short alike a negative move is against the position: an add at -2% bought 2% lower
+    (long) or sold 2% higher (short). Trips open at the window's start are skipped."""
+    by = {}
+    for c in book["changes"]:
+        by.setdefault(c["symbol"], []).append(c)
+    trips = []
+    for cs in by.values():
+        trip, prev = None, 0.0
+        for c in cs:
+            pos, start = c["end_position"], c["start_position"]
+            start = prev if start is None else start
+            px, size = c["price"], abs(pos - start)
+            if trip is None and start == 0 and pos != 0:
+                trip = {"side": 1 if pos > 0 else -1, "orders": [], "exit_qty": 0.0,
+                        "exit_cost": 0.0, "pnl": 0.0}
+            if trip is not None and px:
+                side = trip["side"]
+                if abs(pos) > abs(start) and pos * side > 0:          # adds to the position
+                    o = trip["orders"][-1] if trip["orders"] else None
+                    if (o and abs(px / o["px"] - 1) * 1e4 <= join_bp
+                            and c["ts"] - o["ts"] <= join_minutes * 60_000):
+                        o["px"] = (o["px"] * o["qty"] + px * size) / (o["qty"] + size)
+                        o["qty"] += size
+                    else:
+                        trip["orders"].append({"ts": c["ts"], "px": px, "qty": size,
+                                               "held": abs(start)})
+                else:                                                 # reduces it
+                    cut = min(size, abs(start))
+                    trip["exit_qty"] += cut
+                    trip["exit_cost"] += cut * px
+                trip["pnl"] += c["closed_pnl"] or 0.0
+                if pos == 0 or pos * side < 0:
+                    trip["closed"] = True
+                    trips.append(trip)
+                    trip = None
+                    if pos != 0:                                      # flipped: a new trip
+                        trip = {"side": 1 if pos > 0 else -1, "exit_qty": 0.0,
+                                "exit_cost": 0.0, "pnl": 0.0,
+                                "orders": [{"ts": c["ts"], "px": px, "qty": abs(pos), "held": 0.0}]}
+            prev = pos
+        if trip is not None and trip["orders"]:
+            trip["closed"] = False
+            trips.append(trip)
+    trips = [t for t in trips if t["orders"]]
+    if not trips:
+        return None
+    counts = {}
+    for t in trips:
+        counts[len(t["orders"])] = counts.get(len(t["orders"]), 0) + 1
+    adds = {}
+    for t in trips:
+        o, side = t["orders"], t["side"]
+        for i in range(1, len(o)):
+            held = sum(x["qty"] for x in o[:i])
+            a = adds.setdefault(i, ([], []))
+            a[0].append(side * (o[i]["px"] / o[0]["px"] - 1))
+            a[1].append(o[i]["qty"] / held)
+    exits = []
+    for t in trips:
+        if t["closed"] and t["exit_qty"] > 0:
+            q = sum(x["qty"] for x in t["orders"])
+            avg = sum(x["px"] * x["qty"] for x in t["orders"]) / q
+            exits.append(t["side"] * (t["exit_cost"] / t["exit_qty"] / avg - 1))
+    closed = [t for t in trips if t["closed"]]
+    return {
+        "round_trips": len(trips),
+        "orders_per_trip": {n: round(k / len(trips), 4) for n, k in sorted(counts.items())},
+        "adds": [{"add": i, "trips": len(m), "move_from_first_median": round(statistics.median(m), 5),
+                  "move_p10": round(_q(m, 0.1), 5), "move_p90": round(_q(m, 0.9), 5),
+                  "size_vs_held_median": round(statistics.median(z), 3)}
+                 for i, (m, z) in sorted(adds.items()) if len(m) >= 5],
+        "exit_vs_average_entry": ({"median": round(statistics.median(exits), 5),
+                                   "p10": round(_q(exits, 0.1), 5), "p90": round(_q(exits, 0.9), 5)}
+                                  if exits else None),
+        "closed_trips": len(closed),
+        "losing_trips": sum(1 for t in closed if t["pnl"] < 0),
+    }
+
+
 def profile(book):
     """The style of a book, from its position changes."""
     by = {}
@@ -215,12 +315,116 @@ def profile(book):
                                                   weekdays) if n},
         "realized_pnl": round(pnl, 2),
         "fees": round(fees, 2),
+        "scaling": scaling(book),
     }
 
 
 def cmd_profile(args):
     book = json.loads(pathlib.Path(args.book).read_text(encoding="utf-8"))
     print(json.dumps(profile(book), indent=1))
+    return 0
+
+
+def _opens(book):
+    """{market: [(ts, price, side)]}: each trip's first fill (from flat, or a flip)."""
+    out, prev = {}, {}
+    for c in book["changes"]:
+        m, pos = c["symbol"], c["end_position"]
+        start = c["start_position"] if c["start_position"] is not None else prev.get(m, 0.0)
+        if pos != 0 and (start == 0 or start * pos < 0) and c["price"]:
+            out.setdefault(m, []).append((c["ts"], c["price"], 1 if pos > 0 else -1))
+        prev[m] = pos
+    return out
+
+
+def cmd_entries(args):
+    """Where opening fills sit against common reference levels, and which level they track.
+
+    For each opening fill, reads the minute before it and measures the fill price against
+    hourly EMAs (on closed hours, and live: closed hours plus the forming bar at the current
+    price), hourly SMAs and the session VWAP (from 00:00 UTC). A rule such as "buy 1%
+    under the 12-hour EMA" shows as the reference whose offsets cluster tightest around
+    their median (lowest dispersion: interquartile range over the median's size), with most
+    entries at that level and few ordinary minutes there (lift)."""
+    import oxarchive_backtest as oxb
+
+    book = json.loads(pathlib.Path(args.book).read_text(encoding="utf-8"))
+    src = oxb.Source(args.data)
+    lengths = [int(n) for n in args.lengths.split(",")]
+    have = set(src.markets())
+    opens = {m: v for m, v in _opens(book).items() if m in have}
+    warm = (max(lengths) + 2) * HOUR
+    refs = ([f"ema{n}h" for n in lengths] + [f"ema{n}h_live" for n in lengths]
+            + [f"sma{n}h" for n in lengths] + ["vwap_session"])
+    entry = {r: [] for r in refs}
+    base = {r: [] for r in refs}
+    sides = []
+    for m, ops in sorted(opens.items()):
+        t0, t1 = ops[0][0] - warm, ops[-1][0] + 60_000
+        t0 -= t0 % HOUR
+        rows = src.rows(m, t0, t1, columns=["close", "volume", "quote_volume"])
+        ops = sorted(ops)
+        j, k = 0, 0
+        ema = {n: None for n in lengths}
+        closes = []
+        day, qv, vol = None, 0.0, 0.0
+        side = 1 if sum(o[2] for o in ops) >= 0 else -1
+        for i, r in enumerate(rows):
+            px = r.get("close")
+            if px is None:
+                continue
+            ts = r["ts"]
+            d = ts // DAY
+            if d != day:
+                day, qv, vol = d, 0.0, 0.0
+            vals = {}
+            for n in lengths:
+                a = 2 / (n + 1)
+                if ema[n] is not None:
+                    vals[f"ema{n}h"] = ema[n]
+                    vals[f"ema{n}h_live"] = ema[n] * (1 - a) + px * a
+                if len(closes) >= n:
+                    vals[f"sma{n}h"] = sum(closes[-n:]) / n
+            if vol > 0:
+                vals["vwap_session"] = qv / vol
+            # opening fills in the next minute see this row as their latest
+            while j < len(ops) and ops[j][0] < ts + 120_000:
+                if ops[j][0] >= ts + 60_000:
+                    o_ts, o_px, o_side = ops[j]
+                    for ref, v in vals.items():
+                        entry[ref].append(o_side * (o_px / v - 1))
+                    sides.append(o_side)
+                j += 1
+            if ts >= ops[0][0] and k % 5 == 0:                       # ordinary minutes, sampled
+                for ref, v in vals.items():
+                    base[ref].append(side * (px / v - 1))
+            k += 1
+            qv += r.get("quote_volume") or 0.0
+            vol += r.get("volume") or 0.0
+            if (ts // 60_000 + 1) % 60 == 0:                          # an hour closes
+                closes.append(px)
+                for n in lengths:
+                    a = 2 / (n + 1)
+                    ema[n] = px if ema[n] is None else ema[n] * (1 - a) + px * a
+    out = []
+    for ref in refs:
+        e, b = entry[ref], base[ref]
+        if len(e) < 20 or not b:
+            continue
+        med = statistics.median(e)
+        if abs(med) < 0.0005:
+            continue
+        cut = 0.7 * med
+        hit = (lambda x: x <= cut) if med < 0 else (lambda x: x >= cut)
+        at, bs = sum(map(hit, e)) / len(e), sum(map(hit, b)) / len(b)
+        iqr = _q(e, 0.75) - _q(e, 0.25)
+        out.append({"reference": ref, "entries": len(e), "offset_median": round(med, 5),
+                    "offset_iqr": round(iqr, 5), "dispersion": round(iqr / abs(med), 3),
+                    "entries_at_level": round(at, 3), "minutes_at_level": round(bs, 4),
+                    "lift": round(at / bs, 2) if bs else None})
+    out.sort(key=lambda r: r["dispersion"])
+    print(json.dumps({"opening_fills": sum(len(v) for v in opens.values()),
+                      "markets": sorted(opens), "references": out[: args.top]}, indent=1))
     return 0
 
 
@@ -360,6 +564,12 @@ def main(argv=None):
     f = sub.add_parser("profile", help="the trader's style from the fills")
     f.add_argument("book")
     f.set_defaults(run=cmd_profile)
+    f = sub.add_parser("entries", help="which reference level the opening fills track")
+    f.add_argument("book")
+    f.add_argument("--data", default="data/hyperliquid")
+    f.add_argument("--lengths", default="6,8,12,14,16,20,24,48,72", help="hours, comma-separated")
+    f.add_argument("--top", type=int, default=10)
+    f.set_defaults(run=cmd_entries)
     f = sub.add_parser("replicate", help="score a candidate against the trader's book")
     f.add_argument("book")
     f.add_argument("candidate")
