@@ -18,7 +18,8 @@ python3 trader.py profile trader.json
 ```
 
 - `fetch` reads `GET /v1/hyperliquid/wallets/{address}/positions/changes`: one row per fill that changed
-  a position, signed (shorts negative), from 2025-05-25 on Hyperliquid core. `--venue hip3` and
+  a position, signed (shorts negative), from 2025-05-25 on Hyperliquid core. A Hyperliquid vault is an
+  account like any other: pass the vault's address. `--venue hip3` and
   `--venue lighter` (account index) read the same route on those venues, but the backtest dataset is
   Hyperliquid core only, so the mirror covers core markets alone.
 - It bills like trades, one credit per 1,000 rows. A busy wallet over a year can be hundreds of thousands
@@ -32,6 +33,14 @@ python3 trader.py profile trader.json
 time, long share of held time, largest gross position, maker share, when it opens (UTC hour, weekday),
 realized PnL and fees. `not_in_dataset` lists markets the backtest can't trade; report what share of the
 book they were.
+
+Its `scaling` block shows how the book gets in and out of each round trip: the share of trips with 1, 2, 3...
+orders, then for each add its move from the first fill (signed by side, so negative is against the
+position) and its size against what was held, and where the position closes against its average entry.
+Tight add moves and a tight exit are a fixed ladder (DCA, grid, martingale): adds that always land near
+-2%, -4% and -6% with sizes near 1.0x held, and an exit always near +0.5%, are rules, not habits. `losing_trips` against
+`closed_trips` says whether the book ever takes a loss; a ladder with no stop shows almost none, and its
+risk is in the trips still open.
 
 ## 2. Their record, and skill or luck
 
@@ -56,13 +65,30 @@ usually means fast trading the hourly mirror can't follow; rerun with `clock=1m`
 
 ## 3. Find the rules
 
-Look at where their entries sit before guessing rules. For each opening fill in `trader.json`, read the
-minutes around it with `oxb.Source(DIR).rows(market, t - 6h, t + 1h, columns=[...])` and tabulate what
-was true at entry against all other hours: recent return, funding rate, open interest change, taker flow
-(`cvd_delta`), spread and depth, liquidations, the hour of day. A feature that separates their entries
-from ordinary hours is a candidate rule; one that doesn't is not, however plausible it sounds.
+Look at where their entries sit before guessing rules. Start with price levels:
 
-Write the rules as a strategy file, then score it:
+```bash
+python3 trader.py entries trader.json --data data/hyperliquid
+```
+
+It measures every opening fill against hourly EMAs (on closed hours, and live: closed hours plus the
+forming bar), hourly SMAs and the session VWAP, and ranks the references by how tightly the offsets cluster
+(`dispersion`: interquartile range over the median's size). A rule like "enter 1% under the 12-hour
+EMA" shows as one reference at the top with a tight cluster, most entries at that level and few ordinary
+minutes there (`lift`). Neighbouring lengths score close together; report the range, not just the winner.
+
+Then, for what price levels don't explain, read the minutes around each opening fill with
+`oxb.Source(DIR).rows(market, t - 6h, t + 1h, columns=[...])` and tabulate what was true at entry against
+all other hours: recent return, funding rate, open interest change, taker flow (`cvd_delta`), spread and
+depth, liquidations, the hour of day. A feature that separates their entries from ordinary hours is a
+candidate rule; one that doesn't is not, however plausible it sounds. A filter on which markets it trades
+shows the same way: rank the markets each hour (by volatility, volume) and compare how often the book
+opens in each rank.
+
+Write the rules as a strategy file, then score it. For a ladder, start from `templates/ladder.py` and
+fill in the numbers from `scaling` and `entries`; it places its own resting orders on a 1-minute clock.
+Strategies that place their own orders should cancel only orders still in `ctx.open_orders`: an order
+can fill in the minute it would be replaced, and cancelling a filled order raises.
 
 ```bash
 python3 trader.py replicate trader.json candidate.py --start 2025-06-01 --end 2026-07-01 -p ...
@@ -74,7 +100,9 @@ the two books' daily returns; and the share of their profitable markets where th
 money. The books run at different sizes, so compare returns, not PnL. Both runs are trials in the ledger.
 
 As a guide: the strategy that made a book scores about 1.0 same side and a high return correlation
-against it; an unrelated strategy scores near 0 same side and mostly flat.
+against it; an unrelated strategy scores near 0 same side and mostly flat. A book that trades fast (holds
+under a few hours) needs `--clock 1m` on `replicate`, and even then same side stays well under 1.0 when
+entries land minutes apart; the daily return correlation is the better guide there.
 
 Each revision of the rules is a try. Keep them few and say how many there were. A candidate that copies
 their book closely is a description of what they did, not yet a strategy: put it through the gauntlet

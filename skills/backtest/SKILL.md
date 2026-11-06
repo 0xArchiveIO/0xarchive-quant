@@ -9,7 +9,7 @@ description: >
   Every run goes into a trial ledger, the last months stay sealed until one candidate is committed, and
   nothing is called an edge until it passes costs, nulls, out-of-sample and walk-forward tests and a
   deflated Sharpe over every try. Uses the 0xarchive-backtest engine (0xbt) on Hyperliquid perps.
-  Use for backtest, "is this edge real", test this strategy, reverse engineer this wallet or trader, port
+  Use for backtest, "is this edge real", test this strategy, reverse engineer this wallet, vault or trader, port
   this Pine script, audit this backtest, find me a strategy, or paper trade a strategy.
 allowed-tools: Bash, Read, Write, Edit
 argument-hint: "a wallet, an idea, a script or a strategy file, e.g. 'reverse engineer 0x...', 'does funding predict reversals', 'audit backtest.py'"
@@ -61,7 +61,7 @@ Pick the route from what the user handed over, then read only that reference.
 
 | Input | Route | Read |
 |---|---|---|
-| A wallet address or Lighter account index | Reverse engineer the trader | [references/traders.md](references/traders.md) |
+| A wallet or vault address, or a Lighter account index | Reverse engineer the trader | [references/traders.md](references/traders.md) |
 | A one-line idea, a tweet, a thread, a claim | Write it as a spec, then test it | [references/ideas.md](references/ideas.md) |
 | A paper or PDF | Extract the rules into a spec, then as an idea | [references/ideas.md](references/ideas.md) |
 | A Pine Script or TS indicator | Port it to oxb, then test it | [references/ports.md](references/ports.md) |
