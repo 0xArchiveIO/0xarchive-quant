@@ -1,5 +1,7 @@
 # Examples
 
+**These are API demos, not strategies to run.** Each file shows a few pieces of the API, and most lose money. To go from an idea of your own to a result, start with the [first-strategy tutorial](../../../../docs/first-strategy.md).
+
 One runnable strategy per file, together using every kind of piece in `oxarchive_backtest`. Each file defines `strategy` (a function whose arguments are its parameters), so it runs anywhere a strategy runs:
 
 ```bash
@@ -39,4 +41,4 @@ A few pieces work exactly like a neighbour shown here and have no file of their 
 - `ctx.rebalance(weights)` and `ctx.cost(weights)` are what `x.rebalance` calls.
 - `s.replace(clock="1d")` returns a copy with some arguments changed.
 
-[references/strategy-api.md in the skill](../references/strategy-api.md in the skill) documents every piece.
+[references/strategy-api.md](../../references/strategy-api.md) documents every piece.
