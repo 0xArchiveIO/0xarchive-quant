@@ -32,11 +32,11 @@ API reference).
 Check once per session, and only what the route needs. Paths below are relative to this skill's
 directory.
 
-1. **The engine:** `0xbt --version` should print `0xbt 0.3.1`. If it's missing or older, install it into
+1. **The engine:** `0xbt --version` should print `0xbt 0.3.2`. If it's missing or older, install it into
    the project's Python environment (Python 3.12 or later; prebuilt for macOS, Linux and Windows):
 
    ```bash
-   pip install "0xarchive-backtest[curated]==0.3.1"
+   pip install "0xarchive-backtest[curated]==0.3.2"
    ```
 
    On a platform without a prebuilt wheel, pip builds it from source, which needs Rust (`cargo
@@ -95,7 +95,8 @@ These are what make the result worth posting. They hold on every route.
    (your reasoning from measured numbers), or untested. Never present an inference as a measurement.
 6. **The gauntlet decides, not you.** Report its rung in its own words (`loses after costs`,
    `fails nulls`, `in-sample only`, `holds out of sample`, `passes deflated Sharpe`,
-   `passes sealed holdout`) and never soften, round up or reword it. Do not call anything an edge, a
+   `passes sealed holdout`) and never soften, round up or reword it. A `clock luck` note on the card
+   goes in the same sentence as the rung, with its range of returns. Do not call anything an edge, a
    signal that works, or profitable below `holds out of sample`, and say "deflated Sharpe not passed"
    alongside it at that rung.
 7. **Every try counts.** Tweaking until something passes is what the ledger is for: each variant is a

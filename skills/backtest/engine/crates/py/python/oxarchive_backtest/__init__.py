@@ -20,8 +20,8 @@ built from small swappable steps (references/strategy-api.md in the skill).
 
 The run works out its own warm-up, markets, columns and data from what the strategy reads,
 and calls Python only at the strategy's clock ticks. `Session` runs the same loop on live
-rows; `sweep` runs a parameter grid; `split`, `walk_forward`, `null_test` and
-`deflated_sharpe` check a result isn't luck, and `gauntlet` runs them all for a verdict
+rows; `sweep` runs a parameter grid; `split`, `walk_forward`, `null_test`, `phase_test`
+and `deflated_sharpe` check a result isn't luck, and `gauntlet` runs them all for a verdict
 (evaluate.py). A `Study` keeps a ledger of every run and a sealed holdout (study.py).
 
 Importing this package makes the standard `math` module deterministic: its exp, log, sin, pow
@@ -54,7 +54,7 @@ from ._native import (
     reference,
 )
 from .run import MissingData, Session, Source, backtest, grid, picks, sweep
-from .evaluate import LADDER, deflated_sharpe, gauntlet, null_test, split, walk_forward
+from .evaluate import LADDER, deflated_sharpe, gauntlet, null_test, phase_test, split, walk_forward
 from .study import Sealed, Study
 from .calendar import Moment
 from .series import Series
@@ -117,6 +117,7 @@ __all__ = [
     "math",
     "null_test",
     "packages",
+    "phase_test",
     "picks",
     "reference",
     "split",

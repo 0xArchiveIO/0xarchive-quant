@@ -124,6 +124,13 @@ def test_gauntlet_verdict(study, data):
     assert g["candidate"]["params"] == best["params"]
     if v["level"] > 1:
         assert g["nulls"] is not None
+    # The clock phases run on the candidate, and a winner that loses on one gets the note.
+    ph = g["phases"]
+    assert len(ph["phases"]) == 6 and ph["phases"][0]["sharpe"] == g["candidate"]["stats"]["sharpe"]
+    lucky = (g["candidate"]["stats"]["sharpe"] or 0) > 0 and ph["losing"] > 0
+    assert lucky == any(n.startswith("clock luck") for n in v["notes"])
+    assert oxb.gauntlet(momentum, None, T0, HOLDOUT, data, CONFIG, seeds=1, benchmark="A",
+                        phases=0)["phases"] is None  # fmt: skip
 
 
 def test_gauntlet_rejects_a_losing_strategy(tmp_path, data, monkeypatch):
@@ -158,6 +165,7 @@ def test_cli_study_and_gauntlet(tmp_path, data, monkeypatch, capsys):
                  "--benchmark", "A", "--card", "card.md", "--json", "g.json"]) == 0  # fmt: skip
     card = (tmp_path / "card.md").read_text()
     assert card.startswith("# s.py: ") and "Deflated Sharpe" in card and "the study ledger" in card
+    assert "| Clock phases | 6 clocks, 40 min apart" in card
     assert json.loads((tmp_path / "g.json").read_text())["receipt_id"] in card
     st = oxb.Study.find()
     assert {t["file"] for t in st.trials()} == {"s.py"} and len(st.trials()) == 2

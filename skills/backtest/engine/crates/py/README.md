@@ -64,8 +64,8 @@ markets is not an edge.
 <img alt="A gauntlet report card: verdict holds out of sample, deflated Sharpe 0.93 over 4 tries, short of the 0.95 bar" src="https://raw.githubusercontent.com/0xArchiveIO/0xarchive-quant/main/assets/readme/card-light.png" width="800">
 
 `0xbt gauntlet` runs, in order: the grid as trials; costs and a benchmark; nulls (the flipped signal,
-random books and the strategy's own signal at random lags, redrawn at its holding period); a split and
-walk-forward; the deflated Sharpe over every try; and robustness. The verdict is the first rung whose
+random books and the strategy's own signal at random lags, redrawn at its holding period); the
+candidate on six clock phases, flagged "clock luck" when some of them lose; a split and walk-forward; the deflated Sharpe over every try; and robustness. The verdict is the first rung whose
 rule fails:
 
 | Rung | Verdict |

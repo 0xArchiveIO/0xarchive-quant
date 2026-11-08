@@ -24,10 +24,10 @@ keyword arguments are its parameters (references/strategy-api.md in the skill).
         (default: one per CPU). Prints the top K by return; --json writes every point.
 
     0xbt gauntlet STRATEGY.py --start DATE --end DATE [-g NAME=V1,V2,... ...] [--at DATE]
-                 [--seeds N] [--train D] [--test D] [--benchmark MARKET] [--json FILE]
-                 [--card FILE]  (plus backtest's --data, -p, -c, --max-leverage)
+                 [--seeds N] [--phases N] [--train D] [--test D] [--benchmark MARKET]
+                 [--json FILE] [--card FILE]  (plus backtest's --data, -p, -c, --max-leverage)
         Every check on one strategy (oxb.gauntlet): the grid as trials, costs, nulls,
-        split and walk-forward, the deflated Sharpe over the study's ledger, robustness,
+        clock phases, split and walk-forward, the deflated Sharpe over the study's ledger, robustness,
         and a verdict read off fixed rules. --card writes the one-page report.
 
     0xbt study init [--holdout DATE] [--data DIR]
@@ -278,6 +278,13 @@ def card(result, file, args=None):
                      "at or above; redrawn "
                      + (f"every {n['redrawn_every_ms'] / 3_600_000:g} h" if n.get("redrawn_every_ms")
                         else "every tick") + " |")  # fmt: skip
+    ph = result.get("phases")
+    if ph:
+        gap = (f"{ph['step_ms'] / 3_600_000:g} h" if ph["step_ms"] % 3_600_000 == 0
+               else f"{ph['step_ms'] // 60_000} min")  # fmt: skip
+        lines.append(f"| Clock phases | {len(ph['phases'])} clocks, "
+                     f"{gap} apart: returns {_pct(ph['return_min'])} to "
+                     f"{_pct(ph['return_max'])}, {ph['losing']} of {len(ph['phases'])} lose |")  # fmt: skip
     lines.append(f"| Split at {day(sp['at'])} | picked {json.dumps(sp['params'])}: Sharpe "
                  f"{_num(sp['in_sample'])} before, {_num(_evaluate._sharpe(sp['out_of_sample']))} after |")  # fmt: skip
     if wf:
@@ -314,7 +321,8 @@ def cmd_gauntlet(args):
             result = _evaluate.gauntlet(run.make, _grid(args.grid), run.start, run.end, run.data,
                                         run.config, at=args.at, train=args.train, test=args.test,
                                         seeds=args.seeds, benchmark=args.benchmark,
-                                        base=run.params, max_leverage=run.max_leverage)  # fmt: skip
+                                        base=run.params, max_leverage=run.max_leverage,
+                                        phases=args.phases)  # fmt: skip
     except (ValueError, _run.MissingData, _study.Sealed) as e:
         raise SystemExit(str(e)) from None
     report = result.pop("report")
@@ -478,6 +486,8 @@ def main(argv=None):
     p.add_argument("-g", "--grid", action="append", metavar="NAME=V1,V2,...")
     p.add_argument("--at", help="where the split's out-of-sample part starts (default: two thirds in)")
     p.add_argument("--seeds", type=int, default=10, help="random and stale nulls each (default 10)")
+    p.add_argument("--phases", type=int, default=_evaluate.PHASES,
+                   help="clock phases to run the candidate on (default 6; 0 skips them)")
     p.add_argument("--train", default="180d", help="walk-forward training window (default 180d)")
     p.add_argument("--test", default="60d", help="walk-forward test window (default 60d)")
     p.add_argument("--benchmark", default="BTC", help='a market to hold, or "equal" (default BTC)')

@@ -30,6 +30,7 @@ Hand your coding agent a wallet, a trading idea, a Pine script, a paper or someo
 
 - **Reverse engineer any trader.** Pull a wallet's fills, profile its style, ask whether it was skill or luck, and score candidate rules by how much of the book they reproduce.
 - **Every try counted.** A trial ledger records every backtest the agent runs, and the deflated Sharpe counts all of them, so the tenth tweak can't pass as the first.
+- **Every clock checked.** The gauntlet reruns the winner with its clock moved through one cycle, six times by default, and flags a result that flips when the rule checks a few hours later.
 - **The holdout stays sealed.** The last months of data can't be read until one candidate is committed, once.
 - **A verdict from fixed rules,** never the agent's mood: costs, nulls, out of sample, walk-forward, deflated Sharpe, sealed holdout.
 - **Receipts.** A deterministic Rust engine: the same strategy, data and parameters give the same result hash on every machine.
@@ -98,6 +99,8 @@ Every study ends on one rung, the first whose rule fails. The rules are code in 
 | 4 | **holds out of sample** | the deflated Sharpe over every try is under 0.95 |
 | 5 | **passes deflated Sharpe** | not yet tested on the sealed holdout |
 | 6 | **passes sealed holdout** | the committed candidate made money on months nobody had seen |
+
+Every gauntlet also runs the candidate on six clock phases. A winner that loses on any of them carries a **clock luck** note on its card, with the range of returns, whatever its rung.
 
 ## Showcases
 

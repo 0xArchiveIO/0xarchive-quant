@@ -112,3 +112,37 @@ def test_deflated_sharpe_follows_bailey_and_lopez_de_prado():
     assert out["deflated_sharpe"] == pytest.approx(want, rel=1e-9)
     assert out["threshold"] == pytest.approx(sr0 * math.sqrt(365), rel=1e-9)
     assert out["probabilistic_sharpe"] > out["deflated_sharpe"]
+
+
+def test_shifted_clocks():
+    e = x.shifted(x.every("2d", anchor="2025-06-01"), 8 * HOUR)
+    assert e.every_ms == 2 * DAY and e.anchor_ms == x.every("2d", anchor="2025-06-01 08:00").anchor_ms
+    d = x.shifted(x.daily("20:00"), 8 * HOUR)  # wraps past midnight
+    assert d._spec() == x.daily("04:00")._spec()
+    w = x.shifted(x.weekly("sun", "20:00"), 8 * HOUR)  # Sunday 20:00 + 8 h is Monday 04:00
+    assert w._spec() == x.weekly("mon", "04:00")._spec()
+    m = x.shifted(x.monthly(27), 2 * DAY)  # monthly days wrap inside 1 to 28
+    assert m._spec() == x.monthly(1)._spec()
+    assert x.shifted(x.monthly(-1), DAY) is None and x.shifted(x.at_open("us"), HOUR) is None
+    assert x.period_ms(x.every("2d")) == 2 * DAY and x.period_ms(x.weekly()) == 7 * DAY
+    assert x.period_ms(x.at_open("us")) is None
+    s = momentum()
+    assert s.shifted("1h").clock.anchor_ms == s.clock.anchor_ms + HOUR
+    assert s.shifted(0).clock._spec() == s.clock._spec()
+    with pytest.raises(ValueError, match="can't be moved"):
+        s.replace(clock=x.at_open("us")).shifted("1h")
+
+
+def test_phase_test(two):
+    s = momentum()  # a 4 h clock: six phases 40 minutes apart
+    out = oxb.phase_test(s, T0, end(N), two, CONFIG)
+    rows = out["phases"]
+    assert out["period_ms"] == 4 * HOUR and out["step_ms"] == 40 * 60_000
+    assert [r["offset_ms"] for r in rows] == [k * 40 * 60_000 for k in range(6)]
+    run = lambda v: oxb.backtest(v, T0, end(N), two, CONFIG).stats
+    assert rows[0]["sharpe"] == run(s)["sharpe"]
+    assert rows[3]["return"] == run(s.shifted(120 * 60_000))["return"]
+    assert out["losing"] == sum(1 for r in rows if r["sharpe"] <= 0)
+    assert out["return_min"] <= rows[0]["return"] <= out["return_max"]
+    with pytest.raises(ValueError, match="no 6 phases"):
+        oxb.phase_test(s.replace(clock="1m"), T0, end(N), two, CONFIG)
