@@ -21,6 +21,13 @@ much of its book a candidate strategy reproduces.
         EMAs (closed and live), SMAs and the session VWAP, ranked by how tightly the
         offsets cluster. Reads the backtest dataset; needs the 0xarchive-backtest wheel.
 
+    trader.py grid trader.json [--join-minutes 15] [--min-orders 20]
+        Whether a market is traded as a grid: fills joined into orders (same side and price,
+        close in time), then the most common order size, the most common price step from one
+        order to the next, the share of orders and steps that match them, the share of fills
+        on that price grid, and the range the position moved in. A book that holds a position
+        and trades a fixed size at fixed price steps around it shows near 1.0 on all three.
+
     trader.py replicate trader.json CANDIDATE.py --start DATE --end DATE [--data DIR]
               [-p NAME=VALUE ...] [-c NAME=VALUE ...] [--clock 1h]
         Backtests the trader's book (templates/mirror.py) and the candidate over the same
@@ -29,7 +36,7 @@ much of its book a candidate strategy reproduces.
         trader's daily returns (in the engine, after costs) it tracks. Needs the 0xarchive-backtest
         wheel. Both runs go into an active study's ledger as trials.
 
-fetch and profile use only the standard library; entries and replicate need the engine.
+fetch, profile and grid use only the standard library; entries and replicate need the engine.
 """
 
 import argparse
@@ -325,6 +332,83 @@ def cmd_profile(args):
     return 0
 
 
+def _mode(values, rel=0.01):
+    """The most common value, and how many values sit within rel of it."""
+    counts = {}
+    for v in values:
+        k = float(f"{v:.6g}")
+        counts[k] = counts.get(k, 0) + 1
+    if not counts:
+        return None, 0
+    top = max(counts, key=lambda k: (counts[k], -k))
+    return top, sum(1 for v in values if abs(v - top) <= rel * abs(top))
+
+
+def grid(book, join_minutes=15, min_orders=20):
+    """Per market: is it traded as a fixed-size, fixed-step grid?
+
+    Fills at one price on one side within join_minutes of the last are one order (a resting
+    limit often fills in pieces). Size and step matches allow 1%; a fill is on the grid when
+    its distance from the most traded price is a whole number of steps (within 1% of a step).
+    Markets with fewer than min_orders orders are left out."""
+    by = {}
+    for c in book["changes"]:
+        if c["price"] and c["size"]:
+            by.setdefault(c["symbol"], []).append(c)
+    out = {}
+    for m, cs in by.items():
+        orders = []
+        for c in cs:
+            o = orders[-1] if orders else None
+            if (o and o["side"] == c["side"] and o["px"] == c["price"]
+                    and c["ts"] - o["ts"] <= join_minutes * 60_000):
+                o["qty"] += c["size"]
+                o["ts"] = c["ts"]
+                o["pnl"] += c["closed_pnl"] or 0.0
+                o["reduces"] = o["reduces"] or abs(c["end_position"]) < abs(c["start_position"] or 0.0)
+            else:
+                orders.append({"side": c["side"], "px": c["price"], "qty": c["size"], "ts": c["ts"],
+                               "pnl": c["closed_pnl"] or 0.0,
+                               "reduces": abs(c["end_position"]) < abs(c["start_position"] or 0.0)})
+        if len(orders) < min_orders:
+            continue
+        size, at_size = _mode([o["qty"] for o in orders])
+        steps = [abs(b["px"] - a["px"]) for a, b in zip(orders, orders[1:]) if b["px"] != a["px"]]
+        step, at_step = _mode(steps)
+        on = 0
+        if step:
+            anchor = statistics.mode(c["price"] for c in cs)
+            for c in cs:
+                k = (c["price"] - anchor) / step
+                on += abs(k - round(k)) <= 0.01
+        pos = [c["end_position"] for c in cs]
+        px = sorted(c["price"] for c in cs)
+        reducing = [o for o in orders if o["reduces"]]
+        out[m] = {
+            "fills": len(cs), "orders": len(orders),
+            "order_size": size, "orders_at_that_size": at_size,
+            "price_step": step,
+            "price_step_pct": round(step / px[len(px) // 2] * 100, 3) if step else None,
+            "steps": len(steps), "steps_at_that_step": at_step,
+            "fills_on_grid": on, "share_on_grid": round(on / len(cs), 3),
+            "position_min": min(pos), "position_max": max(pos),
+            "buy_orders": sum(1 for o in orders if o["side"] == "B"),
+            "sell_orders": sum(1 for o in orders if o["side"] == "A"),
+            "reducing_orders_in_profit": (round(sum(1 for o in reducing if o["pnl"] > 0) / len(reducing), 3)
+                                          if reducing else None),
+            "realized_pnl": round(sum(o["pnl"] for o in orders), 2),
+        }
+    return {"address": book["address"], "window": [iso(book["start"]), iso(book["end"])],
+            "join_minutes": join_minutes,
+            "markets": dict(sorted(out.items(), key=lambda kv: -kv[1]["orders"]))}
+
+
+def cmd_grid(args):
+    book = json.loads(pathlib.Path(args.book).read_text(encoding="utf-8"))
+    print(json.dumps(grid(book, args.join_minutes, args.min_orders), indent=1))
+    return 0
+
+
 def _opens(book):
     """{market: [(ts, price, side)]}: each trip's first fill (from flat, or a flip)."""
     out, prev = {}, {}
@@ -564,6 +648,11 @@ def main(argv=None):
     f = sub.add_parser("profile", help="the trader's style from the fills")
     f.add_argument("book")
     f.set_defaults(run=cmd_profile)
+    f = sub.add_parser("grid", help="whether a market is traded as a fixed-size, fixed-step grid")
+    f.add_argument("book")
+    f.add_argument("--join-minutes", type=int, default=15)
+    f.add_argument("--min-orders", type=int, default=20)
+    f.set_defaults(run=cmd_grid)
     f = sub.add_parser("entries", help="which reference level the opening fills track")
     f.add_argument("book")
     f.add_argument("--data", default="data/hyperliquid")
