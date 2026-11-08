@@ -140,6 +140,46 @@ def _null_test(strategy, start, end, source, config, *, seeds, stale, every, max
     return out
 
 
+PHASES = 6  # clock phases the gauntlet runs by default
+
+
+def phase_test(strategy, start, end, source="data/hyperliquid", config=None, *, phases=PHASES,
+               max_leverage=None, params=None):  # fmt: skip
+    """The strategy over [start, end) on `phases` clocks spread evenly over one cycle of its
+    own (an every-2-days rule at +0, +8 h, +16 h ... +40 h): the clock-phase null. The
+    random and stale nulls redraw the signal but keep the days it looks, so they can't
+    see a rule whose result is the luck of its check times. A real effect earns on most
+    phases; a lucky clock earns on one and loses on the next. Returns each phase's
+    offset, Sharpe and return, how many lose (Sharpe 0 or below) and the range."""
+    with _study.kind("check"):
+        return _phase_test(strategy, start, end, source, config, phases=phases,
+                           max_leverage=max_leverage, params=params)  # fmt: skip
+
+
+def _phase_test(strategy, start, end, source, config, *, phases, max_leverage, params):
+    from . import x
+
+    s = _strategy(strategy, params)
+    period = x.period_ms(s.clock)
+    if period is None:
+        raise ValueError(f"the clock {s.clock!r} follows a session, not a cycle")
+    step = period // phases // 60_000 * 60_000
+    if phases < 2 or step < 60_000:
+        raise ValueError(f"a {period // 60_000}-minute clock has no {phases} phases a minute apart")
+    rows = []
+    for k in range(phases):
+        v = s.shifted(k * step) if k else s
+        st = backtest(v, start, end, source, config, max_leverage=max_leverage).stats or {}
+        rows.append({"offset_ms": k * step, "sharpe": st.get("sharpe"), "return": st.get("return")})
+    sharpes = [r["sharpe"] for r in rows if r["sharpe"] is not None]
+    returns = [r["return"] for r in rows if r["return"] is not None]
+    losing = sum(1 for v in sharpes if v <= 0)
+    return {"phases": rows, "period_ms": period, "step_ms": step, "losing": losing,
+            "share_losing": losing / len(sharpes) if sharpes else None,
+            "sharpe_min": min(sharpes, default=None), "sharpe_max": max(sharpes, default=None),
+            "return_min": min(returns, default=None), "return_max": max(returns, default=None)}  # fmt: skip
+
+
 # The standard normal, deterministically: series and continued fractions on + - * / and
 # the package's exp and log (oxarchive_backtest.math), never the platform's erf.
 
@@ -304,7 +344,7 @@ def holding_period(report):
 
 def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *, at=None,
              train="180d", test="60d", seeds=10, benchmark="BTC", base=None,
-             max_leverage=None):  # fmt: skip
+             max_leverage=None, phases=PHASES):  # fmt: skip
     """Runs every check on `make` (a Strategy, or a function of the grid `params`'
     names) over [start, end) and reads a verdict off fixed rules:
 
@@ -312,7 +352,9 @@ def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *
     2. Costs: the candidate's own stats, with fees and funding in.
     3. Nulls: flipped, `seeds` random and `seeds` stale signals (null_test), redrawn once
        per the candidate's own holding period (holding_period), so they trade about as
-       often as it does rather than at every tick.
+       often as it does rather than at every tick. Then the clock phases (phase_test):
+       the candidate on `phases` clocks spread over one cycle of its own (0 skips it). A
+       winner that loses on some of them gets a "clock luck" note.
     4. Out of sample: split at `at` (default two thirds in), then walk-forward
        (`train`/`test`), when the window holds at least a train and two tests.
     5. The deflated Sharpe over every trial in the active study's ledger, or over this
@@ -321,7 +363,7 @@ def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *
        best point, and how much of the PnL one market made.
 
     Returns a dict: verdict {rung, level (1 to 6, LADDER), reasons, notes}, candidate,
-    nulls, split, walk_forward, deflated, robustness, vs (against `benchmark`), holdout and
+    nulls, phases, split, walk_forward, deflated, robustness, vs (against `benchmark`), holdout and
     trials. The verdict is the first rung whose rule fails, in LADDER order; the last rung
     needs the study's committed candidate to be this one and its holdout Sharpe above 0.
     """
@@ -350,6 +392,18 @@ def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *
         nulls = None
         notes.append(f"nulls not run: {e} (a strategy written as one `step` has no signal "
                      "to flip or randomise)")  # fmt: skip
+
+    phase = None
+    if phases:
+        try:
+            phase = phase_test(make, t0, t1, phases=phases, params=p or None, **run)
+        except ValueError as e:
+            notes.append(f"clock phases not run: {e}")
+    if phase and sharpe is not None and sharpe > 0 and phase["losing"]:
+        lo, hi = phase["return_min"], phase["return_max"]
+        notes.append(f"clock luck: {phase['losing']} of {len(phase['phases'])} clock phases lose "
+                     f"(returns {lo:+.2%} to {hi:+.2%}): the result depends on when the rule "
+                     "checks, not only on what it reads")  # fmt: skip
 
     cut = when(at) if at is not None else t0 + (t1 - t0) * 2 // 3 // 86_400_000 * 86_400_000
     sp = split(make, params, t0, t1, cut, base=base, **run)
@@ -449,6 +503,7 @@ def gauntlet(make, params, start, end, source="data/hyperliquid", config=None, *
             "attribution": attribution,
         },
         "nulls": nulls,
+        "phases": phase,
         "split": split_out,
         "walk_forward": wf,
         "deflated": deflated,

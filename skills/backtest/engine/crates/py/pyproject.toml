@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "0xarchive-backtest"
-version = "0.3.1"
+version = "0.3.2"
 description = "Deterministic backtesting for Hyperliquid perps on 0xArchive data: a Rust engine, Python strategies, and a gauntlet that says whether an edge is real"
 readme = "README.md"
 requires-python = ">=3.11"

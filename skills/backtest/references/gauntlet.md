@@ -30,7 +30,7 @@
 ```
 
 Options: `--at DATE` (the split; default two thirds in), `--seeds N` (random and stale nulls each,
-default 10), `--train 180d --test 60d` (walk-forward), `--benchmark BTC` (or `equal`), plus backtest's
+default 10), `--phases N` (clock phases, default 6; 0 skips them), `--train 180d --test 60d` (walk-forward), `--benchmark BTC` (or `equal`), plus backtest's
 `--data`, `-p`, `-c`, `--max-leverage`. In Python: `oxb.gauntlet(make, grid, start, end, source, config)`.
 
 It runs, in order:
@@ -42,6 +42,11 @@ It runs, in order:
 3. **Nulls** (`oxb.null_test`): the flipped signal; random signals (what the universe, weighting and
    costs earn alone); stale signals (its own scores at random earlier times: the scores without their
    timing). A strategy written as one `step` has no signal, so its nulls are skipped with a note.
+   **Clock phases** (`oxb.phase_test`): the candidate again with its clock moved through one cycle
+   of itself, `--phases` times (an every-2-days rule at +0, +8 h ... +40 h; a daily one every 4 h).
+   The random and stale nulls redraw the signal but keep the times it looks, so a rule whose result
+   is the luck of its check times passes them. A real effect earns on most phases. Recorded as
+   checks. Session clocks (`x.at_open`) can't move and are skipped with a note.
 4. **Out of sample:** split at `--at` (pick on the first part, run on the rest), then walk-forward when
    the window holds a train window and two test windows.
 5. **Deflated Sharpe** (Bailey and Lopez de Prado): the probability the Sharpe beats the best that luck
@@ -50,7 +55,7 @@ It runs, in order:
 6. **Robustness:** the share of grid points with a positive Sharpe, the weakest neighbour of the best
    point as a ratio of its Sharpe, and the top market's share of gains.
 
-Expect about `grid + 2 * seeds + 1 + grid * (folds + 1) + folds + 2` backtests: a 4-point grid over 16
+Expect about `grid + 2 * seeds + 1 + phases + grid * (folds + 1) + folds + 2` backtests: a 4-point grid over 16
 months is about 60, roughly 10 minutes on a laptop with the 62-market dataset. Run it in the background.
 
 ## The ladder
@@ -72,6 +77,10 @@ The verdict is the first rung whose rule fails. The rules are code (`oxb.LADDER`
 - **a peak, not a plateau:** a neighbouring setting has under half the best Sharpe. The best point is
   probably fitted to noise even if it passes.
 - **one market:** without its top market the strategy made nothing. It is a bet on that market.
+- **clock luck:** the candidate made money but loses on some of its clock phases (the card's Clock
+  phases row has the range). The result depends on when the rule checks, not only on what it
+  reads. Say it next to the verdict with the range and the count, whatever the rung: a rule that
+  flips sign when it checks a few hours later is not the finding the headline number suggests.
 - **no study:** the deflated Sharpe ignores earlier tries. Start a study and rerun before reporting.
 - **nulls not run:** a `step` strategy. Say the rung was reached without nulls.
 - **the holdout is open:** later results were not tested on unseen data.

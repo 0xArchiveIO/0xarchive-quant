@@ -140,6 +140,49 @@ class at_close(_SessionEdge):
         super().__init__("close", session, before, after)
 
 
+_DAY_MS = 86_400_000
+
+
+def period_ms(c):
+    """How long one cycle of clock `c` lasts, in ms: the step of `every`, a day for daily,
+    a week for weekly, 28 days for monthly. None for a session clock, which follows an
+    exchange's hours rather than a cycle."""
+    if isinstance(c, every):
+        return c.every_ms
+    if isinstance(c, _Calendar):
+        return {"daily": _DAY_MS, "weekdays": _DAY_MS, "weekly": 7 * _DAY_MS,
+                "monthly": 28 * _DAY_MS}[c._s["days"]]  # fmt: skip
+    return None
+
+
+def shifted(c, offset_ms):
+    """Clock `c` moved `offset_ms` later, inside one of its cycles: the clock-phase check
+    runs a rule on several of these to see whether its result depends on when it looks.
+    None for a clock it can't move: a session clock (moving it tests another rule) and a
+    monthly clock on a day counted from the month's end."""
+    if isinstance(c, every):
+        out = object.__new__(every)
+        out.every_ms, out.anchor_ms, out._text = c.every_ms, c.anchor_ms + offset_ms, c._text
+        return out
+    if not isinstance(c, _Calendar):
+        return None
+    s = dict(c._s)
+    if s["days"] in ("daily", "weekdays"):
+        s["at_ms"] = (s["at_ms"] + offset_ms) % _DAY_MS
+    elif s["days"] == "weekly":
+        total = s["day"] * _DAY_MS + s["at_ms"] + offset_ms
+        s["day"], s["at_ms"] = total // _DAY_MS % 7, total % _DAY_MS
+    else:
+        if s["day"] < 1:
+            return None
+        total = (s["day"] - 1) * _DAY_MS + s["at_ms"] + offset_ms
+        s["day"], s["at_ms"] = total // _DAY_MS % 28 + 1, total % _DAY_MS
+    out = object.__new__(type(c))
+    out._s = s
+    _native._last_tick(s, 0)  # checks the moved spec now
+    return out
+
+
 def clock(c):
     """A clock from what a Strategy accepts: a clock piece, a duration ("1h": every hour
     from midnight UTC), or "daily", "weekly" (Monday) or "monthly" (the 1st), at 00:00

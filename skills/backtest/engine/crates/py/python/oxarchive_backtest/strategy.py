@@ -444,6 +444,22 @@ class Strategy:
             raise TypeError(f"replace: no argument {', '.join(sorted(unknown))}")
         return Strategy(**{**self._args, **changes})
 
+    def shifted(self, offset):
+        """The same strategy with its clock (and `hold`, if it is a clock) moved `offset`
+        later ("8h", or ms): the clock-phase check. The universe keeps its own schedule.
+        Raises ValueError for a clock that can't be moved (x.shifted)."""
+        from . import x
+
+        off = offset if isinstance(offset, int) else duration_ms(offset)
+        c = x.shifted(self.clock, off)
+        if c is None:
+            raise ValueError(f"shifted(): the clock {self.clock!r} can't be moved (a session "
+                             "clock, or a monthly day counted from the month's end)")  # fmt: skip
+        changes = {"clock": c}
+        if self.hold is not None and x.shifted(self.hold, off) is not None:
+            changes["hold"] = x.shifted(self.hold, off)
+        return self.replace(**changes)
+
     def _signal_of(self, what):
         if self._signal is None:
             raise ValueError(f"{what} needs a strategy with a signal")
