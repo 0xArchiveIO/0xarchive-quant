@@ -42,6 +42,22 @@ Tight add moves and a tight exit are a fixed ladder (DCA, grid, martingale): add
 `closed_trips` says whether the book ever takes a loss; a ladder with no stop shows almost none, and its
 risk is in the trips still open.
 
+A book that never goes flat in a market has no round trips there, so `scaling` can't see it. When a
+market shows many fills and no round trips (a position held all window), check whether it is traded as a grid:
+
+```bash
+python3 trader.py grid trader.json
+```
+
+It joins fills into orders (same side and price, within `--join-minutes` of each other), then reports the
+most common order size and how many orders match it, the most common price step from one order to the
+next and how many steps match it, how many fills sit on that price grid, and the range the position moved
+in. A fixed grid around a held position (sell a set size every step up, buy it back every step down)
+shows almost every order, step and fill matching (98% or more); a book with no grid shows a few
+percent at most. Its money then comes from two places: the grid's buy-backs and
+re-sells (`realized_pnl`, `reducing_orders_in_profit`), and the held position's direction, which the
+grid never closes. Report both.
+
 ## 2. Their record, and skill or luck
 
 ```bash
