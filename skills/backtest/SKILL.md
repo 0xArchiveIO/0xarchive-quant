@@ -43,7 +43,8 @@ directory.
    --version`; ask the user before installing it from https://rustup.rs). `engine/` beside this skill
    is the same source. Never write a substitute backtester.
 2. **The API key:** `$OXARCHIVE_API_KEY` must be set for pulling data and for the trader route. Never
-   print it. Free keys read only the last 30 days; longer backtests need a paid plan.
+   print it. Free keys read only the last 30 days and, from November 23, 2026,
+   after an account's first 30 days, only through yesterday (UTC); longer backtests need a paid plan.
 3. **The data:** minute Parquet files, `data/hyperliquid/<MARKET>/<YYYY-MM>.parquet`. Use what is in the
    working directory, or pull what the study needs:
 

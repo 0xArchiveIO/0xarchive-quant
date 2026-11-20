@@ -25,7 +25,10 @@ python3 trader.py profile trader.json
 - It bills like trades, one credit per 1,000 rows. A busy wallet over a year can be hundreds of thousands
   of rows: try one month first and tell the user the row count before pulling a year.
 - The Free plan reads only the last 30 days. A `historical_depth_exceeded` error means the window needs
-  a paid plan; say so rather than shortening the window silently.
+  a paid plan; say so rather than shortening the window silently. From November 23, 2026, after an
+  account's first 30 days, Free data also runs through yesterday (UTC): a `forbidden` error with
+  `reason` `today_needs_build` means the window reaches into today. End it at `data_ends_on` and tell
+  the user that today's fills need Build.
 - Wallet data is public venue data, but it is still about a person. Analyse the address the user gave;
   don't go looking for who owns it, and don't build lists of other people's wallets.
 

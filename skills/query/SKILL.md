@@ -1,6 +1,6 @@
 ---
 name: 0xarchive
-version: 1.17.0
+version: 1.17.1
 description: >
   Query historical and real-time crypto market data from 0xArchive across two venues: Hyperliquid and Lighter.
   Lighter has two deployments: mainnet at /v1/lighter and Robinhood Chain at /v1/rh-lighter (USDG-quoted, e.g. BTC, AAPL-USDG).
@@ -370,7 +370,7 @@ How to read positions:
 - Cursors are signed and bound to the route, account or market, and filters: pass `meta.next_cursor` back unchanged with the same parameters. Market and bulk cursors pin the first page's snapshot; if it has been replaced or expired, the next page returns 409 `snapshot_advanced`, so restart without a cursor.
 - Limits: wallet and account routes default 500, max 5,000 rows; market routes default 100, max 2,000; summary series cover at most 168 hours per page; bulk `/positions` defaults to 1,000 rows, max 2,000 as JSON. Where Arrow is enabled, `format=arrow` (or `Accept: application/vnd.apache.arrow.stream`) returns an Arrow IPC stream of up to 50,000 rows with pagination in the `x-next-cursor` header; check `Content-Type`, because JSON is the default.
 
-**Billing:** positions routes bill like trades: one credit per 1,000 rows returned, with a minimum of one credit per request. Account summary routes (`/account`, `/account/history`) and the Lighter L1 lookup cost one credit per request. Plan history windows (Free: rolling 30 days) apply to `timestamp`, `hour`, and `[start, end)`.
+**Billing:** positions routes bill like trades: one credit per 1,000 rows returned, with a minimum of one credit per request. Account summary routes (`/account`, `/account/history`) and the Lighter L1 lookup cost one credit per request. Plan history windows (Free: rolling 30 days; from November 23, 2026, after an account's first 30 days, through yesterday, UTC) apply to `timestamp`, `hour`, and `[start, end)`. A read without them is the latest snapshot, which is today's data.
 
 ### Data Quality (`/v1/data-quality`)
 
@@ -388,7 +388,7 @@ How to read positions:
 
 ### WebSocket Channels
 
-Connect to `wss://api.0xarchive.io/ws?apiKey=KEY&version=2026-10-01`. WebSocket access (including all L4 channels) is available on every tier, starting with Free (10 subscriptions / 2 connections / 10x replay). Live and replay support below matches `GET /v1/capabilities`. Lighter mainnet and Lighter on Robinhood Chain channels are listed separately under [Lighter channels](#lighter-channels).
+Connect to `wss://api.0xarchive.io/ws?apiKey=KEY&version=2026-10-01`. WebSocket access (including all L4 channels) is available on every tier, starting with Free (10 subscriptions / 2 connections / 10x replay). From November 23, 2026, after an account's first 30 days, Free live streams need Build: a live subscribe, and a replay whose `end` is at or after today's 00:00 UTC, answers `{"type":"error","error_code":"forbidden",...}`. Replays of past days stay on Free. Live and replay support below matches `GET /v1/capabilities`. Lighter mainnet and Lighter on Robinhood Chain channels are listed separately under [Lighter channels](#lighter-channels).
 
 | Scope | Channels | Live | Replay |
 |-------|----------|------|--------|
@@ -421,7 +421,7 @@ Connect to `wss://api.0xarchive.io/ws?apiKey=KEY&version=2026-10-01`. WebSocket 
 
 #### Lighter channels
 
-Lighter channels, for both deployments, are served on `wss://api.0xarchive.io/ws` only; a Lighter subscribe on `stream.0xarchive.io` returns an error pointing back to `wss://api.0xarchive.io/ws`. Mainnet symbols are the same as `GET /v1/lighter/instruments`, case-insensitive on subscribe and echoed uppercase. Lighter on Robinhood Chain uses its own `rh_lighter_*` channels, described [below](#lighter-on-robinhood-chain-channels). Live Lighter data is available on every tier and is metered per message, the same as Hyperliquid live data; per-tier subscription and connection limits and the limit of 10 subscribe operations per second per connection apply.
+Lighter channels, for both deployments, are served on `wss://api.0xarchive.io/ws` only; a Lighter subscribe on `stream.0xarchive.io` returns an error pointing back to `wss://api.0xarchive.io/ws`. Mainnet symbols are the same as `GET /v1/lighter/instruments`, case-insensitive on subscribe and echoed uppercase. Lighter on Robinhood Chain uses its own `rh_lighter_*` channels, described [below](#lighter-on-robinhood-chain-channels). Live Lighter data is available on every tier (from November 23, 2026, after an account's first 30 days, Free live streams need Build) and is metered per message, the same as Hyperliquid live data; per-tier subscription and connection limits and the limit of 10 subscribe operations per second per connection apply.
 
 | Channel | Live subscribe | Replay |
 |---------|----------------|--------|
@@ -611,6 +611,8 @@ DAY_AGO=$(( NOW - 86400000 ))
 
 For candles with no explicit range, default to a range that makes sense for the interval (e.g., last 7 days for 4h candles, last 30 days for 1d candles).
 
+From November 23, 2026, after an account's first 30 days, Free data runs through yesterday (UTC). If a request is refused with 403 `forbidden` and `"reason": "today_needs_build"`, the key is on such an account: retry once with `end` (or `timestamp`) at `data_ends_on` 23:59:59.999 UTC, say that the answer runs through yesterday (UTC), and tell the user that today's data needs Build (`upgrade_url`). `current`, `recent` and summary routes always read now, so for those answer from the latest history route ending yesterday, or say that today's value needs Build. See [Tier Limits](#tier-limits).
+
 ## Trade Response Fields
 
 Each trade/fill record includes:
@@ -663,9 +665,15 @@ done
 
 Every tier, Free included, has every symbol, order book depth, Lighter granularity (including `tick`), WebSocket channel and data type, with two exceptions: the live `mempool` channel on `wss://stream.0xarchive.io/ws` comes with Pro, Scale and Enterprise, and trade intent, USDC flows, breadth above the moving average and positioning come with Build, Pro, Scale and Enterprise. Tiers otherwise differ in credits, history window, request rate, and connection limits.
 
+From November 23, 2026, after an account's first 30 days (counted from sign-up), Free data runs through yesterday (UTC): today's data and live streams need Build, and replays of past days stay on Free. In its first 30 days an account keeps today's data.
+
+- A REST request whose window reaches into today is refused before it is metered (not charged): an `end`, or `timestamp` on a point-in-time route such as `GET /orderbook/{symbol}`, at or after today's 00:00 UTC; a range without `end`, which ends now; and every `current`, `recent` and summary route, which always read now. The body is 403 `{"success":false,"code":403,"error_code":"forbidden","reason":"today_needs_build","data_ends_on":"YYYY-MM-DD","required_plans":["build","pro","scale","enterprise"],"upgrade_url":"...","error":"...","request_id":"..."}`; the latest instant Free serves is 23:59:59.999 UTC on `data_ends_on`.
+- Catalog routes are never refused: instruments, Spot pairs, HIP-4 outcomes and questions, and freshness.
+- On WebSocket, a live subscribe and a replay that reaches into today answer `forbidden`; replays of past days are served.
+
 | Tier | Price | Credits | Historical Depth | Rate Limit |
 |------|-------|---------|------------------|------------|
-| Free | $0 | 50,000/mo | Rolling 30 days (30-day span per request or replay) | 15 RPS |
+| Free | $0 | 50,000/mo | Rolling 30 days (30-day span per request or replay); from November 23, 2026, through yesterday (UTC) after an account's first 30 days | 15 RPS |
 | Build | $49/mo | 80M/mo | Full history | 50 RPS |
 | Pro | $199/mo | 400M/mo | Full history | 150 RPS |
 | Scale | $799/mo | 2B/mo | Full history | 500 RPS |
@@ -694,7 +702,7 @@ Errors return JSON with a stable `error_code`. Branch on `error_code` and the HT
 | `historical_depth_exceeded` | 403 | Older than the plan's history window (Free: rolling 30 days) | Move the window forward or upgrade |
 | `historical_range_exceeded` | 403 | The span exceeds the plan's per-request limit | Split into smaller windows |
 | `unauthorized` | 401 | Missing or invalid API key | Set `$OXARCHIVE_API_KEY` |
-| `forbidden` | 403 | The key or account may not make this request, or the plan does not include the dataset (`datatype`, `required_plans`, `upgrade_url` in the body) | Check the key status and account, or change plan; do not retry unchanged |
+| `forbidden` | 403 | The key or account may not make this request, or the plan does not include the dataset (`datatype`, `required_plans`, `upgrade_url` in the body). From November 23, 2026, also a Free account past its first 30 days asking for today's data (`reason: "today_needs_build"`, `data_ends_on`) | Check the key status and account, or change plan; do not retry unchanged. For `today_needs_build`, end the window at `data_ends_on` 23:59:59.999 UTC and retry, or upgrade to Build for today |
 | `unsupported_for_venue` | 404 | This venue does not offer the data type | Use a route from `available_on` in the body, or check `GET /v1/capabilities` |
 | `route_not_found` | 404 | No such route | Check the path; `GET /v1/capabilities` lists each venue's routes |
 | `not_found` | 404 | The resource id does not exist (for example an outcome or incident id) | Check the id |
