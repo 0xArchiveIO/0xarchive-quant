@@ -51,7 +51,7 @@ export OXARCHIVE_API_KEY="0xa_your_api_key"
 0xbt data pull --markets BTC,ETH,SOL --from 2025-06 --to 2026-09
 ```
 
-Then ask with `/0xarchive:0xarchive-backtest`. Free keys read the last 30 days; longer backtests need a [paid plan](https://www.0xarchive.io/pricing). To look at the data before signing up, download the [free week on Hugging Face](https://huggingface.co/datasets/0xArchive/hyperliquid-lighter-market-data-sample): Hyperliquid and Lighter trades, order books, funding, open interest and liquidations as Parquet, no key needed.
+Then ask with `/0xarchive:0xarchive-backtest`. Free keys read the last 30 days and, from November 23, 2026, after an account's first 30 days, only through yesterday (UTC); longer backtests need a [paid plan](https://www.0xarchive.io/pricing). To look at the data before signing up, download the [free week on Hugging Face](https://huggingface.co/datasets/0xArchive/hyperliquid-lighter-market-data-sample): Hyperliquid and Lighter trades, order books, funding, open interest and liquidations as Parquet, no key needed.
 
 <details>
 <summary>Codex, or Claude Code without the plugin</summary>
