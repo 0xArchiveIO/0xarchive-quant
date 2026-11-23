@@ -1,11 +1,11 @@
 ---
 name: 0xarchive
-version: 1.17.0
+version: 1.18.0
 description: >
   Query historical and real-time crypto market data from 0xArchive across two venues: Hyperliquid and Lighter.
   Lighter has two deployments: mainnet at /v1/lighter and Robinhood Chain at /v1/rh-lighter (USDG-quoted, e.g. BTC, AAPL-USDG).
   Hyperliquid includes HIP-3 builder perps (/v1/hyperliquid/hip3), HIP-4 outcome markets (/v1/hyperliquid/hip4), and Spot (/v1/hyperliquid/spot, e.g. HYPE-USDC).
-  Covers orderbooks, trades, candles, funding, open interest, liquidations, account positions, outcome markets, TWAP, CVD, breadth, trade intent, USDC flows, positioning, webhooks, and data quality; data types are route-specific.
+  Covers orderbooks, trades, candles, funding, open interest, liquidations, account positions, outcome markets, TWAP, CVD, breadth, trade intent, USDC flows, positioning, the momentum factor, webhooks, and data quality; data types are route-specific.
   WebSocket support is channel-specific and GET /v1/capabilities lists it per venue and data type: Lighter orderbook, trades, open interest, and funding stream live on both deployments; Lighter candles and L3 are replay-only; L4 channels replay on Hyperliquid core, HIP-3, HIP-4, and Spot.
   Use in Claude Code, Codex, and SKILL.md-compatible agents for market data, orderbooks, trades, candles, funding, prices, positions, real-time streams, prediction markets, or spot pairs on Hyperliquid, HIP-3, HIP-4, Hyperliquid Spot, Lighter, or Lighter on Robinhood Chain.
 allowed-tools: Bash
@@ -143,6 +143,9 @@ Some routes add optional `meta` fields. Lighter trades (both deployments) carry 
 | `GET /positioning` | `window` (required: `1h`, `4h`, `24h`) | Every listed perp's open interest change, taker flow, liquidations and typical moves over a trailing window; current window only. Build plan and above |
 | `GET /usdc-flows` | `start`, `end`, `min_usd`, `kind`, `limit`, `cursor` | Every USDC deposit, withdrawal and HyperEVM transfer, with the HyperCore account; join pages on `id`. Build plan and above |
 | `GET /usdc-flows/volume` | `start`, `end`, `interval`, `limit`, `cursor` | USDC flow totals per bucket, zeros included. Build plan and above |
+| `GET /factors/momentum` | `lookback` (required: `7d`, `14d`), `at` | Every eligible perp's momentum score at one hour, strongest first. Build plan and above |
+| `GET /factors/momentum/current` | `lookback` (required) | The newest hourly momentum reading of every eligible perp. Build plan and above |
+| `GET /factors/momentum/returns` | `lookback` (required), `universe`, `start`, `end`, `interval`, `limit`, `cursor`, `holdings` | The long-short momentum factor's return per `1h` or `1d` bucket; `holdings=true` adds its weights. Build plan and above |
 | `GET /wallets/classify` | `min_orders`, `min_volume_usd`, `uses_twap`, `uses_priority_gas`, `min_cancel_rate`, `max_cancel_rate`, `date`, `sort`, `order`, `limit`, `offset` | Classify wallets by trading behaviour |
 | `GET /liquidations/user/{address}` | `start`, `end`, `limit`, `cursor`, `coin` | Liquidations for a user |
 | `GET /freshness/{symbol}` | -- | Data freshness per data type |
@@ -206,12 +209,13 @@ Coin names are **case-sensitive** and carry the builder prefix (e.g., `xyz:SP500
 
 ### Build-and-above datasets
 
-Trade intent, USDC flows, breadth above the moving average, and positioning come with the Build, Pro, Scale and Enterprise plans. A Free key gets 403 `forbidden` with `datatype`, `required_plans` and `upgrade_url`, and is not charged. USDC flows bill 1 credit per 1,000 rows; the other three 1 credit per request. None has a WebSocket channel.
+Trade intent, USDC flows, breadth above the moving average, positioning, and the momentum factor come with the Build, Pro, Scale and Enterprise plans. A Free key gets 403 `forbidden` with `datatype`, `required_plans` and `upgrade_url`, and is not charged. USDC flows bill 1 credit per 1,000 rows; the others 1 credit per request. None has a WebSocket channel.
 
 - **Trade intent** (`/trade-intent/{symbol}` on Hyperliquid and HIP-3): `interval` is `1s`, `5s`, `15s`, `1m`, `5m`, `15m`, `1h` (default), `4h` or `1d`; `limit` up to 2,000 buckets. Hourly intervals start 2025-05-25 15:00 UTC (HIP-3 2025-10-13 12:00 UTC), minute intervals 2026-07-14, second intervals cover the last 3 days. Both sides of every trade count; market makers are in `mm_usd`. Winners and losers are aggregates over the trailing 72 hours, never wallets. A market idle for more than 7 days has no buckets: a gap, not zero. Set `start` and `end` when paging and stop when `next_cursor` is absent, even on an empty page. Buckets with `is_final: false` can still change.
 - **USDC flows** (`/usdc-flows`, `/usdc-flows/volume`, Hyperliquid only): from 2025-09-27 09:33 UTC. `kind` is `deposit`, `withdraw`, `evm_in` or `evm_out`. A page reads at most 31 days, so with a high `min_usd` it can be empty and still have `has_more: true`: stop on the cursor, not on a short page. Events in the last 3 hours can still be added; re-read that span and deduplicate on `id`. `/volume` refuses `min_usd` and `kind`.
 - **Breadth above the moving average** (`/breadth/above-ma` and `/current` on Hyperliquid and HIP-3): `n` is required. Each bucket carries its last reading; never average `value_pct`. `coverage_ratio` depends on `n` and is not comparable with above-VWAP breadth. Starts: Hyperliquid n=5 2025-03-27, n=20 2025-04-11, n=50 2025-05-11, n=200 2025-10-08; HIP-3 2025-12-27, 2026-01-11, 2026-02-10, 2026-07-10.
 - **Positioning** (`/positioning` on Hyperliquid and HIP-3): `window` is required, and any other parameter is refused; there is no history. One record per market, sorted by symbol; `meta.as_of` is the 5-minute close the records describe. `oi_*` and `mark_*` are null when a bucket has no reading, never 0; `typical_*` are null under 288 counted windows.
+- **Momentum factor** (`/factors/momentum`, `/current` and `/returns`, Hyperliquid core only): method `momentum/1`. `lookback` is required on every route, `7d` or `14d`, with no default; each route refuses a parameter it does not take with 400 `invalid_parameter`. The score is the lookback's close-to-close return over 30-day hourly volatility; a reading lists every perp with 60 days of history and volume in the 30 days before the universe pick, strongest first, with `pct_rank`, `quintile` and `in_top25`/`in_top50`. The factor holds the top 25 (`universe=top25`, default) or top 50 perps by 30-day dollar volume, delisted perps included while they traded, re-picked every 30 days; every Saturday 00:00 UTC it goes long the top fifth on the score and short the bottom fifth, inverse-volatility weighted, each leg summing to 1, earning from 01:00. A bucket's `ret` (`long_ret - short_ret`) is a simple sum of hourly returns, gross of fees and funding: add buckets, do not compound them unless you mean to. A quintile-5 perp is not necessarily held; read `holdings`. `/returns` pages oldest first: `interval` `1d` (default) or `1h`, `limit` up to 1,000 buckets, default window the 30 days before `end`; set `start` and `end` when paging and pass `next_cursor` back. From 2025-05-24 01:00 UTC; an earlier window is empty with `meta.coverage_from`. `is_final` turns true about a day after the hour. The first request after a restart can answer 503 `upstream_unavailable` with `Retry-After` while the factor is prepared: retry.
 
 ### HIP-4 (`/v1/hyperliquid/hip4`)
 
@@ -661,7 +665,7 @@ done
 
 ## Tier Limits
 
-Every tier, Free included, has every symbol, order book depth, Lighter granularity (including `tick`), WebSocket channel and data type, with two exceptions: the live `mempool` channel on `wss://stream.0xarchive.io/ws` comes with Pro, Scale and Enterprise, and trade intent, USDC flows, breadth above the moving average and positioning come with Build, Pro, Scale and Enterprise. Tiers otherwise differ in credits, history window, request rate, and connection limits.
+Every tier, Free included, has every symbol, order book depth, Lighter granularity (including `tick`), WebSocket channel and data type, with two exceptions: the live `mempool` channel on `wss://stream.0xarchive.io/ws` comes with Pro, Scale and Enterprise, and trade intent, USDC flows, breadth above the moving average, positioning and the momentum factor come with Build, Pro, Scale and Enterprise. Tiers otherwise differ in credits, history window, request rate, and connection limits.
 
 | Tier | Price | Credits | Historical Depth | Rate Limit |
 |------|-------|---------|------------------|------------|
