@@ -8,7 +8,7 @@ workflows:
         - 'actions/download-artifact@v7.0.0'
         - 'actions/setup-python@v6.3.0'
         - 'actions/upload-artifact@v6.0.0'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@master'
         - 'pyo3/maturin-action@v1.51.0'
         - 'pypa/gh-action-pypi-publish@release/v1'
         - 'swatinem/rust-cache@v2.9.3'
@@ -48,9 +48,9 @@ dependencies:
         commit: 'sha1-b7c566a772e6b6bfb58ed0dc250532a479d7789f'
         owner_id: 44036562
         repo_id: 192625955
-    'dtolnay/rust-toolchain@stable':
-        ref: 'stable'
-        commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
+    'dtolnay/rust-toolchain@master':
+        ref: 'master'
+        commit: 'sha1-df2a88e9fe4098bad09cb42c3dec7187f15861fc'
         owner_id: 1940490
         repo_id: 260749683
     'pyo3/maturin-action@v1.51.0':
